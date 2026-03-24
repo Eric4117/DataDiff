@@ -1,0 +1,2030 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DataDiff — MySQL 数据库结构对比工具</title>
+  <meta name="description" content="DataDiff 是一款开源的 MySQL 数据库结构对比桌面工具，帮助你快速发现两个数据库之间的表、字段、索引差异，并生成 ALTER SQL。" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #080d0c;
+      --bg-card: #0f1918;
+      --bg-card2: #162221;
+      --border: rgba(255,255,255,0.08);
+      --border-hover: rgba(255,255,255,0.16);
+      --text: #f0f5f4;
+      --text-muted: #7a9e9b;
+      --text-subtle: #486562;
+      --accent: #0d9488;
+      --accent-soft: rgba(13,148,136,0.12);
+      --accent-glow: rgba(13,148,136,0.25);
+      --amber: #f59e0b;
+      --amber-soft: rgba(245,158,11,0.1);
+      --blue: #3b82f6;
+      --blue-soft: rgba(59,130,246,0.1);
+      --green: #10b981;
+      --green-soft: rgba(16,185,129,0.1);
+      --radius: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 24px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ========== NOISE TEXTURE ========== */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ========== NAV ========== */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 clamp(1.5rem, 5vw, 4rem);
+      height: 64px;
+      background: rgba(10,10,15,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    .nav-logo-icon {
+      width: 32px; height: 32px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .nav-logo-icon svg { width: 18px; height: 18px; color: #fff; }
+
+    .nav-logo-name {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+
+    .btn-nav-gh {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      color: var(--text) !important;
+      padding: 6px 14px !important;
+      border-radius: 8px !important;
+      font-size: 13px !important;
+      transition: all 0.2s !important;
+    }
+
+    .btn-nav-gh:hover {
+      background: rgba(255,255,255,0.1) !important;
+      border-color: var(--border-hover) !important;
+    }
+
+    .btn-nav-gh svg { width: 16px; height: 16px; }
+
+    /* ========== HERO ========== */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 120px clamp(1.5rem, 5vw, 4rem) 80px;
+      overflow: hidden;
+    }
+
+    /* Background gradient orbs */
+    .hero::after {
+      content: '';
+      position: absolute;
+      top: 15%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 700px; height: 500px;
+      background: radial-gradient(ellipse at center, rgba(13,148,136,0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(13,148,136,0.25);
+      border-radius: 999px;
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #5eead4;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #5eead4;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .hero-title {
+      font-size: clamp(2.8rem, 7vw, 5.5rem);
+      font-weight: 800;
+      letter-spacing: -2px;
+      line-height: 1.08;
+      margin-bottom: 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-title span {
+      background: linear-gradient(135deg, #5eead4 0%, #0d9488 40%, #06b6d4 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-subtitle {
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      color: var(--text-muted);
+      max-width: 560px;
+      margin: 0 auto 40px;
+      line-height: 1.7;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+      margin-bottom: 64px;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent);
+      color: #fff;
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 12px 24px;
+      border-radius: 10px;
+      transition: all 0.2s;
+      box-shadow: 0 0 0 1px rgba(13,148,136,0.5), 0 4px 24px rgba(13,148,136,0.3);
+    }
+
+    .btn-primary:hover {
+      background: #6b5be6;
+      box-shadow: 0 0 0 1px rgba(13,148,136,0.6), 0 8px 32px rgba(13,148,136,0.4);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      color: var(--text);
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 12px 24px;
+      border-radius: 10px;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.1);
+      border-color: var(--border-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary svg, .btn-secondary svg { width: 16px; height: 16px; }
+
+    /* ========== HERO MOCK WINDOW ========== */
+    .hero-window {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 900px;
+      margin: 0 auto;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.08),
+        0 4px 12px rgba(0,0,0,0.3),
+        0 32px 72px rgba(0,0,0,0.55),
+        0 0 80px rgba(13,148,136,0.07);
+    }
+
+    /* macOS title bar */
+    .window-bar {
+      display: flex;
+      align-items: center;
+      padding: 11px 16px;
+      background: #d9d9d9;
+      position: relative;
+    }
+
+    .window-dots {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+      z-index: 1;
+    }
+
+    .window-dots span {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+    }
+    .window-dots span:nth-child(1) { background: #ff5f57; box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.15); }
+    .window-dots span:nth-child(2) { background: #febc2e; box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.1); }
+    .window-dots span:nth-child(3) { background: #28c840; box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.1); }
+
+    .window-title {
+      position: absolute;
+      left: 50%; transform: translateX(-50%);
+      font-size: 12px;
+      font-weight: 500;
+      color: #555;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      white-space: nowrap;
+    }
+
+    /* App header inside hero window */
+    .window-app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 18px;
+      border-bottom: 1px solid #e2e8f0;
+      background: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+    }
+
+    .window-logo {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .window-logo-icon {
+      width: 24px; height: 24px;
+      background: #3b82f6;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: white;
+    }
+
+    .window-logo-name { font-size: 12px; font-weight: 600; color: #0f172a; }
+    .window-logo-sub  { font-size: 11px; color: #94a3b8; }
+
+    .window-nav-tabs {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      background: #f1f5f9;
+      border-radius: 7px;
+      padding: 3px;
+    }
+
+    .window-tab {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #64748b;
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+    }
+
+    .window-tab.active {
+      background: #ffffff;
+      color: #0f172a;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    /* Main content area inside hero window */
+    .window-body {
+      padding: 14px 18px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+    }
+
+    /* Hero conn bar */
+    .hero-conn-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 7px;
+      padding: 7px 12px;
+    }
+
+    .hero-conn-sides { display: flex; align-items: center; gap: 12px; }
+
+    .hero-conn-side {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .hcs-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .hcs-left  { color: #1d4ed8; }
+    .hcs-right { color: #7e22ce; }
+    .hero-conn-vs { font-size: 10px; color: #cbd5e1; }
+
+    .hero-conn-reset {
+      display: flex; align-items: center; gap: 3px;
+      padding: 3px 8px;
+      border: 1px solid #e2e8f0;
+      border-radius: 5px;
+      background: #fff;
+      font-size: 10px;
+      color: #475569;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: default;
+    }
+
+    /* Hero filter pills (compact) */
+    .hero-filters {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .hfp {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 100px;
+      border: 1px solid #e2e8f0;
+      font-size: 10px;
+      font-weight: 500;
+      color: #64748b;
+      background: #fff;
+    }
+
+    .hfp.hfp-amber  { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+    .hfp.hfp-slate  { background: #f8fafc; border-color: #94a3b8; color: #1e293b; }
+    .hfp-dot { width: 5px; height: 5px; border-radius: 50%; }
+    .hfp-n   { font-weight: 700; }
+
+    /* Hero table diff rows */
+    .hero-diff-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .hero-trow {
+      display: flex;
+      align-items: center;
+      padding: 7px 12px;
+      border: 1px solid #e2e8f0;
+      border-left-width: 3px;
+      border-radius: 7px;
+      background: #fff;
+      gap: 8px;
+    }
+
+    .hero-trow.htr-modified  { border-left-color: #fbbf24; }
+    .hero-trow.htr-left-only { border-left-color: #60a5fa; }
+    .hero-trow.htr-right-only{ border-left-color: #c084fc; }
+    .hero-trow.htr-same      { border-left-color: #4ade80; }
+
+    /* 左组：chevron + icon + name + badge，整体 flex:1 */
+    .htr-l {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    /* 右组：meta + SQL btn，固定在右侧 */
+    .htr-r {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .htr-chevron { width: 12px; height: 12px; color: #94a3b8; flex-shrink: 0; }
+    .htr-ico     { width: 12px; height: 12px; flex-shrink: 0; }
+
+    .htr-name {
+      font-family: 'JetBrains Mono', 'SF Mono', monospace;
+      font-size: 11px;
+      font-weight: 500;
+      color: #0f172a;
+      white-space: nowrap;
+    }
+
+    .htr-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 7px;
+      border-radius: 100px;
+      border: 1px solid;
+      font-size: 9px;
+      font-weight: 600;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    .htb-modified   { color: #92400e; background: #fffbeb; border-color: #fcd34d; }
+    .htb-left-only  { color: #1e3a8a; background: #eff6ff; border-color: #93c5fd; }
+    .htb-right-only { color: #581c87; background: #faf5ff; border-color: #c4b5fd; }
+    .htb-same       { color: #14532d; background: #f0fdf4; border-color: #86efac; }
+
+    .htr-meta { font-size: 10px; color: #94a3b8; white-space: nowrap; }
+
+    .htr-sql-btn {
+      display: flex; align-items: center; gap: 3px;
+      padding: 2px 8px;
+      border: 1px solid rgba(59,130,246,0.3);
+      border-radius: 5px;
+      background: rgba(59,130,246,0.05);
+      color: #3b82f6;
+      font-size: 9px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: default;
+      font-family: inherit;
+    }
+
+    /* ========== SECTION ========== */
+    section {
+      padding: clamp(4rem, 8vw, 7rem) clamp(1.5rem, 5vw, 4rem);
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1.15;
+      margin-bottom: 16px;
+    }
+
+    .section-desc {
+      font-size: 16px;
+      color: var(--text-muted);
+      max-width: 520px;
+      line-height: 1.7;
+    }
+
+    /* ========== FEATURES GRID ========== */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 48px;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      transition: all 0.25s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      opacity: 0;
+      transition: opacity 0.25s;
+    }
+
+    .feature-card:hover {
+      border-color: var(--border-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.3);
+    }
+
+    .feature-card:hover::before { opacity: 1; }
+
+    .feature-icon {
+      width: 44px; height: 44px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 18px;
+    }
+
+    .feature-icon svg { width: 22px; height: 22px; }
+
+    .icon-purple { background: var(--accent-soft); color: var(--accent); }
+    .icon-amber { background: var(--amber-soft); color: var(--amber); }
+    .icon-blue { background: var(--blue-soft); color: var(--blue); }
+    .icon-green { background: var(--green-soft); color: var(--green); }
+
+    .feature-card h3 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.3px;
+    }
+
+    .feature-card p {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.65;
+    }
+
+    .feature-tag {
+      display: inline-block;
+      margin-top: 16px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      color: var(--text-subtle);
+    }
+
+    /* ========== HOW IT WORKS ========== */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0;
+      margin-top: 48px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .step {
+      padding: 32px 28px;
+      border-right: 1px solid var(--border);
+      position: relative;
+    }
+
+    .step:last-child { border-right: none; }
+
+    .step-num {
+      font-size: 36px;
+      font-weight: 800;
+      color: rgba(13,148,136,0.2);
+      letter-spacing: -2px;
+      line-height: 1;
+      margin-bottom: 16px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .step h3 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .step p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* ========== APP WINDOW MOCK ========== */
+    .app-window-wrap {
+      max-width: 960px;
+      margin: 48px auto 0;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.08),
+        0 4px 12px rgba(0,0,0,0.3),
+        0 24px 60px rgba(0,0,0,0.5),
+        0 48px 100px rgba(0,0,0,0.3);
+    }
+
+    .app-titlebar {
+      display: flex;
+      align-items: center;
+      padding: 11px 16px;
+      background: #d9d9d9;
+      position: relative;
+      user-select: none;
+    }
+
+    .traffic-lights {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+      z-index: 1;
+    }
+
+    .traffic-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .traffic-dot.tclose { background: #ff5f57; box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.15); }
+    .traffic-dot.tmin   { background: #febc2e; box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.1); }
+    .traffic-dot.tmax   { background: #28c840; box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.1); }
+
+    .app-titlebar-label {
+      position: absolute;
+      left: 50%; transform: translateX(-50%);
+      font-size: 12px;
+      font-weight: 500;
+      color: #555;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      white-space: nowrap;
+    }
+
+    /* — App body (light theme matching real product) — */
+    .app-body {
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      color: #0f172a;
+      font-size: 13px;
+    }
+
+    .app-header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      border-bottom: 1px solid #e2e8f0;
+      background: #ffffff;
+    }
+
+    .app-logo-area {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .app-logo-icon {
+      width: 28px; height: 28px;
+      background: #3b82f6;
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .app-logo-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .app-logo-sub {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .app-nav-tabs {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      background: #f1f5f9;
+      border-radius: 8px;
+      padding: 3px;
+    }
+
+    .app-tab {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 11px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #64748b;
+    }
+
+    .app-tab.active {
+      background: #ffffff;
+      color: #0f172a;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+    }
+
+    .app-tab-count {
+      font-size: 10px;
+      font-weight: 700;
+      color: #94a3b8;
+    }
+
+    .app-main {
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: #ffffff;
+    }
+
+    /* Connection info bar */
+    .conn-info-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #f8fafc;
+      padding: 9px 14px;
+    }
+
+    .conn-sides {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .conn-side {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .conn-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .conn-dot-left  { background: #3b82f6; }
+    .conn-dot-right { background: #a855f7; }
+    .conn-lbl-left  { color: #1d4ed8; }
+    .conn-lbl-right { color: #7e22ce; }
+    .conn-vs { color: #cbd5e1; font-size: 11px; }
+
+    .btn-app-reset {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      background: #fff;
+      color: #475569;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: default;
+    }
+
+    /* Filter / summary bar */
+    .app-filter-area {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .app-filter-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
+    .filter-sub-lbl {
+      font-size: 10px;
+      color: #94a3b8;
+      white-space: nowrap;
+      margin-right: 2px;
+    }
+
+    .fpill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px;
+      border-radius: 100px;
+      border: 1px solid #e2e8f0;
+      font-size: 11px;
+      font-weight: 500;
+      color: #64748b;
+      background: #fff;
+      white-space: nowrap;
+    }
+
+    .fpill.fp-active-amber  { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+    .fpill.fp-active-slate  { background: #f8fafc; border-color: #94a3b8; color: #1e293b; }
+    .fpill.fp-active-blue   { background: #eff6ff; border-color: #93c5fd; color: #1e3a8a; }
+    .fpill.fp-active-purple { background: #faf5ff; border-color: #c4b5fd; color: #581c87; }
+    .fpill.fp-active-green  { background: #f0fdf4; border-color: #86efac; color: #14532d; }
+
+    .fpill-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .fpill-count { font-weight: 700; }
+
+    /* Diff table rows */
+    .app-diff-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .app-trow {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      overflow: hidden;
+      border-left-width: 3px;
+    }
+
+    .app-trow.tr-modified  { border-left-color: #fbbf24; }
+    .app-trow.tr-left-only { border-left-color: #60a5fa; }
+    .app-trow.tr-right-only{ border-left-color: #c084fc; }
+    .app-trow.tr-same      { border-left-color: #4ade80; }
+
+    .app-trow-hdr {
+      display: flex;
+      align-items: center;
+      padding: 9px 14px;
+      gap: 10px;
+      background: #fff;
+    }
+
+    /* 左组：chevron + icon + name + badge */
+    .trow-l {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    /* 右组：meta + SQL btn */
+    .trow-r {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .trow-chevron {
+      width: 14px; height: 14px;
+      color: #94a3b8;
+      flex-shrink: 0;
+    }
+
+    .trow-tbl-ico {
+      width: 14px; height: 14px;
+      flex-shrink: 0;
+    }
+
+    .trow-name {
+      font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      font-weight: 500;
+      color: #0f172a;
+      white-space: nowrap;
+    }
+
+    .trow-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 100px;
+      border: 1px solid;
+      font-size: 10px;
+      font-weight: 600;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    .tb-modified   { color: #92400e; background: #fffbeb; border-color: #fcd34d; }
+    .tb-left-only  { color: #1e3a8a; background: #eff6ff; border-color: #93c5fd; }
+    .tb-right-only { color: #581c87; background: #faf5ff; border-color: #c4b5fd; }
+    .tb-same       { color: #14532d; background: #f0fdf4; border-color: #86efac; }
+
+    .trow-meta {
+      font-size: 10px;
+      color: #94a3b8;
+      white-space: nowrap;
+    }
+
+    .btn-gen-sql {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border: 1px solid rgba(59,130,246,0.3);
+      border-radius: 6px;
+      background: rgba(59,130,246,0.05);
+      color: #3b82f6;
+      font-size: 10px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: default;
+    }
+
+    /* Column diff (expanded table) */
+    .col-diff-wrap {
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .cdiff-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    .cdiff-table th {
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 6px 10px;
+      text-align: left;
+      font-weight: 500;
+      color: #64748b;
+      white-space: nowrap;
+    }
+
+    .cdiff-table th:first-child { padding-left: 24px; width: 130px; }
+    .cdiff-table th.th-ind      { width: 24px; text-align: center; }
+
+    .cdiff-table td {
+      padding: 5px 10px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+
+    .cdiff-table td:first-child { padding-left: 24px; }
+    .cdiff-table tr:last-child td { border-bottom: none; }
+
+    .cr-same       { background: #fff; }
+    .cr-modified   { background: rgba(251,191,36,0.07); }
+    .cr-right-only { background: rgba(192,132,252,0.07); }
+    .cr-left-only  { background: rgba(96,165,250,0.07); }
+
+    .cd-name {
+      font-family: 'JetBrains Mono', 'SF Mono', monospace;
+      font-weight: 500;
+      color: #0f172a;
+    }
+
+    .cd-changed-tag {
+      font-size: 9px;
+      color: #d97706;
+      font-weight: 400;
+      margin-left: 2px;
+    }
+
+    .cd-ind {
+      text-align: center;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .ind-same  { color: #22c55e; }
+    .ind-mod   { color: #f59e0b; }
+    .ind-ronly { color: #a855f7; }
+    .ind-lonly { color: #3b82f6; }
+
+    .cd-cell {
+      font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    }
+
+    .cd-type   { color: #0f172a; }
+    .cd-null   { color: #64748b; }
+    .cd-pk     { color: #d97706; font-weight: 700; margin-left: 4px; }
+    .cd-auto   { color: #6366f1; font-style: italic; margin-left: 4px; }
+    .cd-idx    { color: #475569; margin-left: 4px; }
+    .cd-hl     { background: #fef3c7; color: #92400e; border-radius: 3px; padding: 0 3px; }
+    .cd-hl-r   { background: #f3e8ff; color: #6b21a8; border-radius: 3px; padding: 0 3px; }
+
+    .cd-missing {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: #cbd5e1;
+      font-style: italic;
+      font-size: 10px;
+    }
+
+    .missing-line {
+      height: 1px;
+      width: 20px;
+      background: #cbd5e1;
+    }
+
+    .col-diff-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 10px 5px 24px;
+      border-top: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+
+    .cdf-text { font-size: 10px; color: #94a3b8; }
+
+    .btn-show-more {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 10px;
+      color: #475569;
+      background: none;
+      border: none;
+      cursor: default;
+      font-family: inherit;
+    }
+
+    /* ========== OPEN SOURCE ========== */
+    .oss-section {
+      text-align: center;
+    }
+
+    .oss-card {
+      background: linear-gradient(135deg, rgba(13,148,136,0.08) 0%, rgba(6,182,212,0.05) 100%);
+      border: 1px solid rgba(13,148,136,0.2);
+      border-radius: var(--radius-xl);
+      padding: clamp(3rem, 6vw, 5rem) clamp(2rem, 5vw, 4rem);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .oss-card::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: 50%;
+      transform: translateX(-50%);
+      width: 600px; height: 300px;
+      background: radial-gradient(ellipse, rgba(13,148,136,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .oss-icon {
+      width: 64px; height: 64px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(13,148,136,0.25);
+      border-radius: var(--radius-lg);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 24px;
+    }
+
+    .oss-icon svg { width: 30px; height: 30px; color: var(--accent); }
+
+    .oss-card h2 {
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      font-weight: 800;
+      letter-spacing: -0.8px;
+      margin-bottom: 14px;
+    }
+
+    .oss-card p {
+      font-size: 16px;
+      color: var(--text-muted);
+      max-width: 480px;
+      margin: 0 auto 32px;
+      line-height: 1.7;
+    }
+
+    .oss-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      position: relative;
+    }
+
+    .oss-stats {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+      margin-top: 40px;
+      flex-wrap: wrap;
+    }
+
+    .oss-stat {
+      text-align: center;
+    }
+
+    .oss-stat-num {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      color: var(--text);
+    }
+
+    .oss-stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* ========== PLATFORM BADGES ========== */
+    .platform-section {
+      text-align: center;
+      padding-top: 0;
+    }
+
+    .platform-label {
+      font-size: 12px;
+      color: var(--text-subtle);
+      font-weight: 500;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .platform-list {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .platform-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      transition: all 0.2s;
+    }
+
+    .platform-badge:hover {
+      border-color: var(--border-hover);
+      color: var(--text);
+    }
+
+    .platform-badge svg { width: 18px; height: 18px; }
+
+    /* ========== FOOTER ========== */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px clamp(1.5rem, 5vw, 4rem);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .footer-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-subtle);
+      font-size: 13px;
+    }
+
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+      color: var(--text-muted);
+      font-size: 14px;
+      text-decoration: none;
+    }
+
+    .footer-logo-icon {
+      width: 24px; height: 24px;
+      background: var(--accent);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .footer-logo-icon svg { width: 13px; height: 13px; color: #fff; }
+
+    .footer-links {
+      display: flex;
+      gap: 20px;
+      list-style: none;
+      flex-wrap: wrap;
+    }
+
+    .footer-links a {
+      color: var(--text-subtle);
+      text-decoration: none;
+      font-size: 13px;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover { color: var(--text-muted); }
+
+    /* ========== DIVIDER ========== */
+    .section-divider {
+      width: 100%;
+      height: 1px;
+      background: var(--border);
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* ========== RESPONSIVE ========== */
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .steps { grid-template-columns: 1fr; }
+      .step { border-right: none; border-bottom: 1px solid var(--border); }
+      .step:last-child { border-bottom: none; }
+      footer { flex-direction: column; align-items: flex-start; }
+    }
+
+    /* ========== SCROLL ANIMATION ========== */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .fade-up.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">
+    <div class="nav-logo-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
+      </svg>
+    </div>
+    <span class="nav-logo-name">DataDiff</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#features">功能</a></li>
+    <li><a href="#how-it-works">使用方式</a></li>
+    <li><a href="#diff-preview">预览</a></li>
+    <li>
+      <a href="https://github.com/your-org/datadiff" class="btn-nav-gh">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/>
+        </svg>
+        GitHub
+      </a>
+    </li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">开源免费 · 桌面应用</div>
+  <h1 class="hero-title">
+    数据库结构差异<br /><span>一目了然</span>
+  </h1>
+  <p class="hero-subtitle">
+    DataDiff 是一款开源的 MySQL 数据库结构对比工具，帮你快速找出两个库之间的表、字段、索引差异，并自动生成迁移 SQL。
+  </p>
+  <div class="hero-actions">
+    <a href="https://github.com/your-org/datadiff/releases" class="btn-primary">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+      </svg>
+      免费下载
+    </a>
+    <a href="https://github.com/your-org/datadiff" class="btn-secondary">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/>
+      </svg>
+      查看源码
+    </a>
+  </div>
+
+  <!-- Mock App Window -->
+  <div class="hero-window">
+    <!-- macOS title bar -->
+    <div class="window-bar">
+      <div class="window-dots">
+        <span></span><span></span><span></span>
+      </div>
+      <span class="window-title">DataDiff — MySQL 结构对比</span>
+    </div>
+
+    <!-- App header (light) -->
+    <div class="window-app-header">
+      <div class="window-logo">
+        <div class="window-logo-icon">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4 4 4M17 8v12m0 0 4-4m-4 4-4-4"/></svg>
+        </div>
+        <span class="window-logo-name">DataDiff</span>
+        <span class="window-logo-sub">MySQL 结构对比</span>
+      </div>
+      <div class="window-nav-tabs">
+        <div class="window-tab">
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>首页
+        </div>
+        <div class="window-tab active">
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4 4 4M17 8v12m0 0 4-4m-4 4-4-4"/></svg>对比
+        </div>
+        <div class="window-tab">
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>结构
+        </div>
+        <div class="window-tab">
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.657 4.03 3 9 3s9-1.343 9-3V5"/><path d="M3 12c0 1.657 4.03 3 9 3s9-1.343 9-3"/></svg>数据源
+        </div>
+      </div>
+    </div>
+
+    <!-- Main body (light) -->
+    <div class="window-body">
+      <!-- Connection bar -->
+      <div class="hero-conn-bar">
+        <div class="hero-conn-sides">
+          <span class="hero-conn-side">
+            <span class="hcs-dot" style="background:#3b82f6"></span>
+            <span class="hcs-left">prod_server / shop_prod</span>
+          </span>
+          <span class="hero-conn-vs">vs</span>
+          <span class="hero-conn-side">
+            <span class="hcs-dot" style="background:#a855f7"></span>
+            <span class="hcs-right">dev_server / shop_dev</span>
+          </span>
+        </div>
+        <button class="hero-conn-reset">
+          <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"/></svg>
+          重新对比
+        </button>
+      </div>
+
+      <!-- Filter pills -->
+      <div class="hero-filters">
+        <span class="hfp hfp-slate"><span class="hfp-dot" style="background:#94a3b8"></span>全部<span class="hfp-n">12</span></span>
+        <span class="hfp hfp-amber"><span class="hfp-dot" style="background:#f59e0b"></span>有差异<span class="hfp-n">5</span></span>
+        <span class="hfp"><span class="hfp-dot" style="background:#3b82f6"></span>仅左侧<span class="hfp-n">1</span></span>
+        <span class="hfp"><span class="hfp-dot" style="background:#a855f7"></span>仅右侧<span class="hfp-n">2</span></span>
+        <span class="hfp"><span class="hfp-dot" style="background:#22c55e"></span>相同<span class="hfp-n">4</span></span>
+      </div>
+
+      <!-- Table diff list -->
+      <div class="hero-diff-list">
+
+        <!-- users — modified -->
+        <div class="hero-trow htr-modified">
+          <div class="htr-l">
+            <svg class="htr-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m19 9-7 7-7-7"/></svg>
+            <svg class="htr-ico" style="color:#f59e0b" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18M10 3v18M3 3h18v18H3z"/></svg>
+            <span class="htr-name">users</span>
+            <span class="htr-badge htb-modified">有差异</span>
+          </div>
+          <div class="htr-r">
+            <span class="htr-meta">2字段 · 1索引 差异</span>
+            <button class="htr-sql-btn"><svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/></svg>生成 SQL</button>
+          </div>
+        </div>
+
+        <!-- audit_log — left_only -->
+        <div class="hero-trow htr-left-only">
+          <div class="htr-l">
+            <svg class="htr-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"/></svg>
+            <svg class="htr-ico" style="color:#3b82f6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18M10 3v18M3 3h18v18H3z"/></svg>
+            <span class="htr-name">audit_log</span>
+            <span class="htr-badge htb-left-only">仅左侧</span>
+          </div>
+          <div class="htr-r">
+            <span class="htr-meta">8 个字段</span>
+            <button class="htr-sql-btn"><svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/></svg>生成 SQL</button>
+          </div>
+        </div>
+
+        <!-- user_sessions — right_only -->
+        <div class="hero-trow htr-right-only">
+          <div class="htr-l">
+            <svg class="htr-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"/></svg>
+            <svg class="htr-ico" style="color:#a855f7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18M10 3v18M3 3h18v18H3z"/></svg>
+            <span class="htr-name">user_sessions</span>
+            <span class="htr-badge htb-right-only">仅右侧</span>
+          </div>
+          <div class="htr-r">
+            <span class="htr-meta">5 个字段</span>
+            <button class="htr-sql-btn"><svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/></svg>生成 SQL</button>
+          </div>
+        </div>
+
+        <!-- orders — modified -->
+        <div class="hero-trow htr-modified">
+          <div class="htr-l">
+            <svg class="htr-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"/></svg>
+            <svg class="htr-ico" style="color:#f59e0b" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18M10 3v18M3 3h18v18H3z"/></svg>
+            <span class="htr-name">orders</span>
+            <span class="htr-badge htb-modified">有差异</span>
+          </div>
+          <div class="htr-r">
+            <span class="htr-meta">1字段 差异</span>
+            <button class="htr-sql-btn"><svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/></svg>生成 SQL</button>
+          </div>
+        </div>
+
+        <!-- products — same -->
+        <div class="hero-trow htr-same">
+          <div class="htr-l">
+            <svg class="htr-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"/></svg>
+            <svg class="htr-ico" style="color:#22c55e" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18M10 3v18M3 3h18v18H3z"/></svg>
+            <span class="htr-name">products</span>
+            <span class="htr-badge htb-same">相同</span>
+          </div>
+          <div class="htr-r">
+            <span class="htr-meta">15 个字段，完全相同</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="fade-up">
+    <div class="section-label">核心功能</div>
+    <h2 class="section-title">专为数据库开发者打造</h2>
+    <p class="section-desc">无论是上线前的结构校验，还是多环境数据库同步，DataDiff 帮你省去繁琐的手工比对。</p>
+  </div>
+
+  <div class="features-grid">
+    <div class="feature-card fade-up">
+      <div class="feature-icon icon-amber">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
+        </svg>
+      </div>
+      <h3>精准结构对比</h3>
+      <p>逐表、逐字段、逐索引对比两个 MySQL 数据库的结构差异，高亮每一处变更，不放过任何细节。</p>
+      <span class="feature-tag">Tables · Columns · Indexes</span>
+    </div>
+
+    <div class="feature-card fade-up">
+      <div class="feature-icon icon-purple">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9.75 16.5 12l-2.25 2.25m-4.5 0L7.5 12l2.25-2.25M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25z" />
+        </svg>
+      </div>
+      <h3>自动生成迁移 SQL</h3>
+      <p>一键导出 ALTER TABLE 语句，直接用于数据库迁移，告别手写 SQL 出错的烦恼。</p>
+      <span class="feature-tag">ALTER SQL · 一键复制</span>
+    </div>
+
+    <div class="feature-card fade-up">
+      <div class="feature-icon icon-blue">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0 1 12 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125h7.5c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-7.5z" />
+        </svg>
+      </div>
+      <h3>表结构浏览</h3>
+      <p>可视化浏览任意数据库的表结构，查看字段类型、约束、索引，一键复制 DDL 给 AI 助手分析。</p>
+      <span class="feature-tag">DDL · AI 友好</span>
+    </div>
+
+    <div class="feature-card fade-up">
+      <div class="feature-icon icon-green">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 2.438c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125m16.5 2.438v2.438" />
+        </svg>
+      </div>
+      <h3>多数据源管理</h3>
+      <p>本地安全存储多个 MySQL 连接配置，密码不离开你的电脑。快速切换开发、测试、生产环境。</p>
+      <span class="feature-tag">本地加密存储</span>
+    </div>
+
+    <div class="feature-card fade-up">
+      <div class="feature-icon icon-purple">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5 10.5 6.75 14.25 10.5 17.25 7.5 21 11.25" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25z" />
+        </svg>
+      </div>
+      <h3>快捷操作记录</h3>
+      <p>每次对比或查看记录会自动保存为快捷操作，下次一键启动，无需重新配置。</p>
+      <span class="feature-tag">一键复现 · 历史记录</span>
+    </div>
+
+    <div class="feature-card fade-up">
+      <div class="feature-icon icon-amber">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+        </svg>
+      </div>
+      <h3>安全 · 离线运行</h3>
+      <p>纯本地桌面应用，无任何数据上传，所有连接信息加密存储在本机，完全离线可用。</p>
+      <span class="feature-tag">Zero 数据上传 · 完全私有</span>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- HOW IT WORKS -->
+<section id="how-it-works">
+  <div class="fade-up">
+    <div class="section-label">使用方式</div>
+    <h2 class="section-title">三步完成数据库对比</h2>
+    <p class="section-desc">极简操作流程，让数据库结构对比变得像查文档一样简单。</p>
+  </div>
+
+  <div class="steps fade-up">
+    <div class="step">
+      <div class="step-num">01</div>
+      <h3>添加数据库连接</h3>
+      <p>在「数据源」页面添加你的 MySQL 连接信息，支持添加多个环境（开发 / 测试 / 生产）。</p>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <h3>选择对比数据库</h3>
+      <p>在「对比」页面分别选择左侧和右侧的连接与数据库，点击开始对比，几秒内完成扫描。</p>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <h3>查看差异 · 导出 SQL</h3>
+      <p>一览差异汇总，展开查看每张表的详细字段变更，一键生成并复制 ALTER SQL。</p>
+    </div>
+    <div class="step">
+      <div class="step-num">04</div>
+      <h3>保存快捷操作</h3>
+      <p>对比完成后自动保存为快捷入口，下次直接在首页一键复现，无需重新选择。</p>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- DIFF PREVIEW -->
+<section id="diff-preview">
+  <div class="fade-up">
+    <div class="section-label">产品预览</div>
+    <h2 class="section-title">这就是真实的使用界面</h2>
+    <p class="section-desc">从表级汇总到字段级明细，差异一目了然，以下为实际产品 UI 的高保真还原。</p>
+  </div>
+
+  <!-- App Window Mock -->
+  <div class="app-window-wrap fade-up">
+
+    <!-- macOS title bar -->
+    <div class="app-titlebar">
+      <div class="traffic-lights">
+        <span class="traffic-dot tclose"></span>
+        <span class="traffic-dot tmin"></span>
+        <span class="traffic-dot tmax"></span>
+      </div>
+      <span class="app-titlebar-label">DataDiff — MySQL 结构对比</span>
+    </div>
+
+    <!-- App body (light theme) -->
+    <div class="app-body">
+
+      <!-- App header with nav tabs -->
+      <div class="app-header-bar">
+        <div class="app-logo-area">
+          <div class="app-logo-icon">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4 4 4M17 8v12m0 0 4-4m-4 4-4-4"/></svg>
+          </div>
+          <span class="app-logo-name">DataDiff</span>
+          <span class="app-logo-sub">MySQL 结构对比</span>
+        </div>
+        <div class="app-nav-tabs">
+          <div class="app-tab">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            首页
+          </div>
+          <div class="app-tab active">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4 4 4M17 8v12m0 0 4-4m-4 4-4-4"/></svg>
+            对比
+          </div>
+          <div class="app-tab">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            结构
+          </div>
+          <div class="app-tab">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.657 4.03 3 9 3s9-1.343 9-3V5"/><path d="M3 12c0 1.657 4.03 3 9 3s9-1.343 9-3"/></svg>
+            数据源
+            <span class="app-tab-count">3</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main content -->
+      <div class="app-main">
+
+        <!-- Connection bar -->
+        <div class="conn-info-bar">
+          <div class="conn-sides">
+            <span class="conn-side">
+              <span class="conn-dot conn-dot-left"></span>
+              <span class="conn-lbl-left">prod_server / shop_prod</span>
+            </span>
+            <span class="conn-vs">vs</span>
+            <span class="conn-side">
+              <span class="conn-dot conn-dot-right"></span>
+              <span class="conn-lbl-right">dev_server / shop_dev</span>
+            </span>
+          </div>
+          <button class="btn-app-reset">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"/></svg>
+            重新对比
+          </button>
+        </div>
+
+        <!-- Filter / summary bar -->
+        <div class="app-filter-area">
+          <div class="app-filter-row">
+            <span class="fpill fp-active-slate">
+              <span class="fpill-dot" style="background:#94a3b8"></span>全部<span class="fpill-count">12</span>
+            </span>
+            <span class="fpill fp-active-amber">
+              <span class="fpill-dot" style="background:#f59e0b"></span>有差异<span class="fpill-count">5</span>
+            </span>
+            <span class="fpill">
+              <span class="fpill-dot" style="background:#3b82f6"></span>仅左侧<span class="fpill-count">1</span>
+            </span>
+            <span class="fpill">
+              <span class="fpill-dot" style="background:#a855f7"></span>仅右侧<span class="fpill-count">2</span>
+            </span>
+            <span class="fpill">
+              <span class="fpill-dot" style="background:#22c55e"></span>相同<span class="fpill-count">4</span>
+            </span>
+          </div>
+          <div class="app-filter-row">
+            <span class="filter-sub-lbl">差异细分</span>
+            <span class="fpill"><span class="fpill-dot" style="background:#f97316"></span>字段差异<span class="fpill-count">3</span></span>
+            <span class="fpill"><span class="fpill-dot" style="background:#ef4444"></span>字段缺失<span class="fpill-count">2</span></span>
+            <span class="fpill"><span class="fpill-dot" style="background:#f43f5e"></span>类型/长度<span class="fpill-count">2</span></span>
+            <span class="fpill"><span class="fpill-dot" style="background:#0ea5e9"></span>字符集<span class="fpill-count">1</span></span>
+            <span class="fpill"><span class="fpill-dot" style="background:#8b5cf6"></span>索引差异<span class="fpill-count">2</span></span>
+          </div>
+        </div>
+
+        <!-- Table diff list -->
+        <div class="app-diff-list">
+
+          <!-- users — modified, expanded -->
+          <div class="app-trow tr-modified">
+            <div class="app-trow-hdr">
+              <div class="trow-l">
+                <svg class="trow-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m19 9-7 7-7-7"/></svg>
+                <svg class="trow-tbl-ico" style="color:#f59e0b" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18M10 3v18M3 3h18v18H3z"/></svg>
+                <span class="trow-name">users</span>
+                <span class="trow-badge tb-modified">有差异</span>
+              </div>
+              <div class="trow-r">
+                <span class="trow-meta">2字段 · 1索引 差异</span>
+                <button class="btn-gen-sql"><svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/></svg>生成 SQL</button>
+              </div>
+            </div>
+            <!-- Column diff table (expanded) -->
+            <div class="col-diff-wrap">
+              <table class="cdiff-table">
+                <thead>
+                  <tr>
+                    <th>字段名</th>
+                    <th class="th-ind"></th>
+                    <th><span style="color:#1d4ed8">prod_server / shop_prod</span></th>
+                    <th><span style="color:#7e22ce">dev_server / shop_dev</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="cr-same">
+                    <td class="cd-name">id</td>
+                    <td class="cd-ind ind-same">✓</td>
+                    <td class="cd-cell"><span class="cd-type">bigint</span><span class="cd-null"> NOT NULL</span><span class="cd-pk">PK</span><span class="cd-auto">auto_increment</span></td>
+                    <td class="cd-cell"><span class="cd-type">bigint</span><span class="cd-null"> NOT NULL</span><span class="cd-pk">PK</span><span class="cd-auto">auto_increment</span></td>
+                  </tr>
+                  <tr class="cr-modified">
+                    <td class="cd-name">username</td>
+                    <td class="cd-ind ind-same">✓</td>
+                    <td class="cd-cell"><span class="cd-type">varchar(64)</span><span class="cd-null"> NOT NULL</span><span class="cd-idx">IDX</span></td>
+                    <td class="cd-cell"><span class="cd-type">varchar(64)</span><span class="cd-null"> NOT NULL</span><span class="cd-idx">IDX</span></td>
+                  </tr>
+                  <tr class="cr-modified">
+                    <td class="cd-name">email<span class="cd-changed-tag">(类型, 非空)</span></td>
+                    <td class="cd-ind ind-mod">≠</td>
+                    <td class="cd-cell"><span class="cd-hl">varchar(100)</span><span class="cd-hl"> NULL</span></td>
+                    <td class="cd-cell"><span class="cd-hl">varchar(255)</span><span class="cd-hl"> NOT NULL</span></td>
+                  </tr>
+                  <tr class="cr-right-only">
+                    <td class="cd-name">avatar_url</td>
+                    <td class="cd-ind ind-ronly">→</td>
+                    <td>
+                      <div class="cd-missing"><div class="missing-line"></div><span>缺失</span><div class="missing-line"></div></div>
+                    </td>
+                    <td class="cd-cell"><span class="cd-hl-r">varchar(500)</span><span class="cd-null"> NULL</span></td>
+                  </tr>
+                  <tr class="cr-same">
+                    <td class="cd-name">created_at</td>
+                    <td class="cd-ind ind-same">✓</td>
+                    <td class="cd-cell"><span class="cd-type">datetime</span><span class="cd-null"> NOT NULL</span></td>
+                    <td class="cd-cell"><span class="cd-type">datetime</span><span class="cd-null"> NOT NULL</span></td>
+                  </tr>
+                  <tr class="cr-same">
+                    <td class="cd-name">updated_at</td>
+                    <td class="cd-ind ind-same">✓</td>
+                    <td class="cd-cell"><span class="cd-type">datetime</span><span class="cd-null"> NULL</span></td>
+                    <td class="cd-cell"><span class="cd-type">datetime</span><span class="cd-null"> NULL</span></td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="col-diff-footer">
+                <span class="cdf-text">还有 3 个相同字段已折叠</span>
+                <button class="btn-show-more">
+                  <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><circle cx="12" cy="12" r="3"/></svg>
+                  展开相同字段
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- audit_log — left_only -->
+          <div class="app-trow tr-left-only">
+            <div class="app-trow-hdr">
+              <div class="trow-l">
+                <svg class="trow-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"/></svg>
+                <svg class="trow-tbl-ico" style="color:#3b82f6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18M10 3v18M3 3h18v18H3z"/></svg>
+                <span class="trow-name">audit_log</span>
+                <span class="trow-badge tb-left-only">仅左侧</span>
+              </div>
+              <div class="trow-r">
+                <span class="trow-meta">8 个字段</span>
+                <button class="btn-gen-sql"><svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/></svg>生成 SQL</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- user_sessions — right_only -->
+          <div class="app-trow tr-right-only">
+            <div class="app-trow-hdr">
+              <div class="trow-l">
+                <svg class="trow-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"/></svg>
+                <svg class="trow-tbl-ico" style="color:#a855f7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18M10 3v18M3 3h18v18H3z"/></svg>
+                <span class="trow-name">user_sessions</span>
+                <span class="trow-badge tb-right-only">仅右侧</span>
+              </div>
+              <div class="trow-r">
+                <span class="trow-meta">5 个字段</span>
+                <button class="btn-gen-sql"><svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/></svg>生成 SQL</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- orders — modified -->
+          <div class="app-trow tr-modified">
+            <div class="app-trow-hdr">
+              <div class="trow-l">
+                <svg class="trow-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"/></svg>
+                <svg class="trow-tbl-ico" style="color:#f59e0b" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18M10 3v18M3 3h18v18H3z"/></svg>
+                <span class="trow-name">orders</span>
+                <span class="trow-badge tb-modified">有差异</span>
+              </div>
+              <div class="trow-r">
+                <span class="trow-meta">1字段 · 1属性 差异</span>
+                <button class="btn-gen-sql"><svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/></svg>生成 SQL</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- products — same -->
+          <div class="app-trow tr-same">
+            <div class="app-trow-hdr">
+              <div class="trow-l">
+                <svg class="trow-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"/></svg>
+                <svg class="trow-tbl-ico" style="color:#22c55e" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18M10 3v18M3 3h18v18H3z"/></svg>
+                <span class="trow-name">products</span>
+                <span class="trow-badge tb-same">相同</span>
+              </div>
+              <div class="trow-r">
+                <span class="trow-meta">15 个字段，完全相同</span>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /.app-diff-list -->
+      </div><!-- /.app-main -->
+    </div><!-- /.app-body -->
+  </div><!-- /.app-window-wrap -->
+</section>
+
+<div class="section-divider"></div>
+
+<!-- OPEN SOURCE -->
+<section id="open-source" class="oss-section">
+  <div class="oss-card fade-up">
+    <div class="oss-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/>
+      </svg>
+    </div>
+    <h2>完全开源，永久免费</h2>
+    <p>DataDiff 基于 MIT 协议开源，代码完全透明。欢迎 Star、Fork、提 Issue 或贡献代码。</p>
+    <div class="oss-actions">
+      <a href="https://github.com/your-org/datadiff" class="btn-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px">
+          <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/>
+        </svg>
+        GitHub 上查看
+      </a>
+      <a href="https://github.com/your-org/datadiff/releases" class="btn-secondary">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:16px;height:16px">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+        </svg>
+        下载最新版
+      </a>
+    </div>
+
+    <div class="oss-stats">
+      <div class="oss-stat">
+        <div class="oss-stat-num">MIT</div>
+        <div class="oss-stat-label">开源协议</div>
+      </div>
+      <div class="oss-stat">
+        <div class="oss-stat-num">macOS · Win</div>
+        <div class="oss-stat-label">支持平台</div>
+      </div>
+      <div class="oss-stat">
+        <div class="oss-stat-num">MySQL</div>
+        <div class="oss-stat-label">数据库支持</div>
+      </div>
+      <div class="oss-stat">
+        <div class="oss-stat-num">0</div>
+        <div class="oss-stat-label">数据上传</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PLATFORM -->
+<section class="platform-section">
+  <div class="fade-up">
+    <p class="platform-label">支持平台</p>
+    <div class="platform-list">
+      <div class="platform-badge">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2a10 10 0 0 1 0 20A10 10 0 0 1 2 12 10 10 0 0 1 12 2m0 2a8 8 0 0 0 0 16A8 8 0 0 0 20 12 8 8 0 0 0 12 4m0 2c2.67 0 5.06 1.28 6.56 3.29L7.29 18.56A7.997 7.997 0 0 1 4 12c0-3.31 2-6.16 5-7.46V6m5 0v.1c1.17.37 2.21.97 3.08 1.75l-1.43 1.44A5.95 5.95 0 0 0 12 8c-3.31 0-6 2.69-6 6 0 1.51.56 2.88 1.47 3.94L18.56 7.29C17.55 5.8 15.43 4.97 12 4.97V6z"/>
+        </svg>
+        macOS
+      </div>
+      <div class="platform-badge">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M3 12V6.75l6-1.32v6.17L3 12m17 0v5.25l-7 1.53V12l7-.01M3 13.08l6 .92v6.16l-6-1.84v-5.24m17 .92 1.08-.08-7.08.7v6.7l7-1.53v-5.79M1 5.99 11 4v8H1V5.99m20 1.93v7.99l-10 2V13l10-6.08z"/>
+        </svg>
+        Windows
+      </div>
+      <div class="platform-badge">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 2.438c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+        </svg>
+        MySQL 5.7 / 8.x
+      </div>
+      <div class="platform-badge">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+        </svg>
+        完全离线
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-left">
+    <a href="#" class="footer-logo">
+      <div class="footer-logo-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
+        </svg>
+      </div>
+      DataDiff
+    </a>
+    <span style="color:var(--text-subtle)">·</span>
+    <span>MIT License · 开源免费</span>
+  </div>
+
+  <ul class="footer-links">
+    <li><a href="https://github.com/your-org/datadiff">GitHub</a></li>
+    <li><a href="https://github.com/your-org/datadiff/releases">下载</a></li>
+    <li><a href="https://github.com/your-org/datadiff/issues">反馈问题</a></li>
+    <li><a href="https://github.com/your-org/datadiff/blob/main/LICENSE">许可证</a></li>
+  </ul>
+</footer>
+
+<script>
+  // Scroll animation
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(el => {
+      if (el.isIntersecting) {
+        el.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+
+  // Stagger children in grids
+  document.querySelectorAll('.features-grid .fade-up').forEach((el, i) => {
+    el.style.transitionDelay = `${i * 80}ms`;
+  });
+
+</script>
+
+</body>
+</html>
