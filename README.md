@@ -23,12 +23,12 @@
 - **npm** 或兼容的包管理器（pnpm / yarn 需自行对照锁文件）
 - 打包 **macOS** 应用：需在 macOS 上执行，并建议安装 **Xcode Command Line Tools**
 - 打包 **Windows** 安装包：需在 **Windows** 上执行（生成 NSIS）；在 macOS 上交叉编译 Windows 需额外配置，此处不展开
-- 依赖中含 **`better-sqlite3` 等原生模块**：若 `npm install` 报错，请确保本机已安装对应平台的 C++ 构建环境（Windows: Visual Studio Build Tools；Linux: `build-essential` 等）
+- 依赖中含 `**better-sqlite3` 等原生模块**：若 `npm install` 报错，请确保本机已安装对应平台的 C++ 构建环境（Windows: Visual Studio Build Tools；Linux: `build-essential` 等）
 
 ## 快速开始（开发）
 
 ```bash
-git clone https://github.com/<你的用户名>/DataDiff.git
+git clone https://github.com/Eric4117/DataDiff
 cd DataDiff
 npm install
 npm run dev
@@ -38,12 +38,14 @@ npm run dev
 
 ### 常用脚本
 
-| 命令 | 说明 |
-|------|------|
-| `npm run dev` | 开发调试 |
-| `npm run build` | 仅构建产物（输出到 `out/`，供预览或配合 `electron-builder`） |
-| `npm run preview` | 构建后在本地预览（electron-vite） |
+
+| 命令                | 说明                                                      |
+| ----------------- | ------------------------------------------------------- |
+| `npm run dev`     | 开发调试                                                    |
+| `npm run build`   | 仅构建产物（输出到 `out/`，供预览或配合 `electron-builder`）             |
+| `npm run preview` | 构建后在本地预览（electron-vite）                                 |
 | `npm run package` | 先执行 `electron-vite build`，再调用 **electron-builder** 打安装包 |
+
 
 ## 打包发布
 
@@ -52,7 +54,7 @@ npm install
 npm run package
 ```
 
-- 安装包输出目录：**`dist/`**（由 `package.json` 中 `build.directories.output` 指定）
+- 安装包输出目录：`**dist/**`（由 `package.json` 中 `build.directories.output` 指定）
 - **macOS**：默认生成 **DMG**（`build.mac.target`）
 - **Windows**：默认生成 **NSIS 安装程序**（`build.win.target`）
 
@@ -72,8 +74,6 @@ npm run package
 ## 协议（License）
 
 本项目以 **[MIT License](./LICENSE)** 开源。使用、复制、修改与分发请遵守该协议全文（见仓库根目录 `LICENSE` 文件）。
-
-
 
 ## 贡献与问题
 
