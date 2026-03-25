@@ -4,15 +4,21 @@
 
 > Desktop app for comparing database **schema** across connections (MySQL / PostgreSQL / SQLite).
 
+## 下载与安装（普通用户）
+
+**无需安装 Node.js、无需自己编译。** 请直接下载已打包好的安装程序使用。
+
+1. 打开 **[GitHub Releases](https://github.com/Eric4117/DataDiff/releases)**，进入**最新版本**。
+2. 在 **Assets** 中选择与你系统匹配的文件并下载：
+   - **macOS（Apple 芯片或 Intel）**：下载 **`.dmg`**，打开后把 DataDiff 拖进「应用程序」文件夹。
+   - **Windows**：下载 **`.exe`**（NSIS 安装包），双击按向导安装。
+
+安装完成后启动应用即可。若系统提示「无法验证开发者」等安全提示，可在 macOS 上对应用**右键 → 打开**一次，或在系统设置中允许运行。
+
+**还没有看到你的系统安装包？** 可在 [Issues](https://github.com/Eric4117/DataDiff/issues) 留言需求；构建与发布由维护者在 Releases 中提供附件。
+
 ## 产品落地页（Landing）
-
-
-
-| 方式 | 说明 |
-|------|------|
-| **在线访问** | 官网介绍及功能说明：<https://eric4117.github.io/DataDiff/>） |
-| **本地预览** | `npm run landing:preview`，浏览器打开终端里提示的地址（默认 <http://localhost:4173>） |
-
+**在线访问** ： 功能介绍与说明：<https://eric4117.github.io/DataDiff/> 
 
 ## 功能概览
 
@@ -27,15 +33,17 @@
 - [React](https://react.dev/) 18 + [TypeScript](https://www.typescriptlang.org/) + [Vite](https://vitejs.dev/) 5
 - [Tailwind CSS](https://tailwindcss.com/) + [Radix UI](https://www.radix-ui.com/)
 
-## 环境要求
+## 从源码运行与开发
 
-- **Node.js** 建议 **20.x** 及以上（与仓库 `devDependencies` 中 `@types/node` 一致）
-- **npm** 或兼容的包管理器（pnpm / yarn 需自行对照锁文件）
-- 打包 **macOS** 应用：需在 macOS 上执行，并建议安装 **Xcode Command Line Tools**
-- 打包 **Windows** 安装包：需在 **Windows** 上执行（生成 NSIS）；在 macOS 上交叉编译 Windows 需额外配置，此处不展开
-- 依赖中含 `**better-sqlite3` 等原生模块**：若 `npm install` 报错，请确保本机已安装对应平台的 C++ 构建环境（Windows: Visual Studio Build Tools；Linux: `build-essential` 等）
+以下仅适用于**克隆仓库、改代码或本地调试**；**日常使用者请用上一节「下载与安装」。**
 
-## 快速开始（开发）
+### 环境要求
+
+- **Node.js** 建议 **20.x** 及以上
+- **npm** 或兼容的包管理器
+- 依赖中含 **`better-sqlite3` 等原生模块**：若 `npm install` 失败，请安装对应平台 C++ 构建环境（Windows：[Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) 并勾选「使用 C++ 的桌面开发」；macOS：Xcode Command Line Tools；Linux：`build-essential` 等）
+
+### 快速开始
 
 ```bash
 git clone https://github.com/Eric4117/DataDiff
@@ -44,31 +52,28 @@ npm install
 npm run dev
 ```
 
-开发模式下会启动 Electron 并加载 Vite 开发服务，支持热更新（以 electron-vite 行为为准）。
-
 ### 常用脚本
 
+| 命令 | 说明 |
+|------|------|
+| `npm run dev` | 开发调试 |
+| `npm run build` | 构建到 `out/` |
+| `npm run preview` | 构建后本地预览（electron-vite） |
+| `npm run package` | 构建并调用 electron-builder 打安装包 |
 
-| 命令                | 说明                                                      |
-| ----------------- | ------------------------------------------------------- |
-| `npm run dev`     | 开发调试                                                    |
-| `npm run build`   | 仅构建产物（输出到 `out/`，供预览或配合 `electron-builder`）             |
-| `npm run preview` | 构建后在本地预览（electron-vite）                                 |
-| `npm run package` | 先执行 `electron-vite build`，再调用 **electron-builder** 打安装包 |
+### 维护者：如何打出安装包并上传到 Releases
 
-
-## 打包发布
+在**对应操作系统**上执行（输出在 **`dist/`**）：
 
 ```bash
 npm install
 npm run package
 ```
 
-- 安装包输出目录：`**dist/**`（由 `package.json` 中 `build.directories.output` 指定）
-- **macOS**：默认生成 **DMG**（`build.mac.target`）
-- **Windows**：默认生成 **NSIS 安装程序**（`build.win.target`）
+- **macOS**：默认 **DMG**。可按需指定架构，例如：`npx electron-builder --mac --arm64`（Apple 芯片）、`--mac --x64`（Intel）、`--mac --universal`（通用包）。
+- **Windows**：需在 **Windows** 上执行，生成 **NSIS `.exe`**（electron-builder 依赖本机 Windows 工具链）。步骤：安装 Node.js 20+、Visual Studio Build Tools（含「使用 C++ 的桌面开发」），再执行上面的 `npm run package`，在 `dist/` 取安装程序。
 
-在发布到 GitHub Releases 时，可将 `dist/` 内对应平台的产物作为附件上传。
+将 `dist/` 中生成的 **`.dmg` / `.exe`** 作为附件上传到 [Releases](https://github.com/Eric4117/DataDiff/releases)，用户即可在「下载与安装」一节所述页面直接下载，**无需自行编译**。
 
 ## 项目结构（简要）
 

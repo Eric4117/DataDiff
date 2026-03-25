@@ -1279,6 +1279,31 @@
       position: relative;
     }
 
+    .oss-download-note {
+      font-size: 13px;
+      color: var(--text-muted);
+      max-width: 560px;
+      margin: 28px auto 0;
+      line-height: 1.75;
+      text-align: left;
+      padding: 16px 20px;
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .oss-download-note p { margin: 0; max-width: none; font-size: 13px; }
+    .oss-download-note p + p { margin-top: 12px; }
+    .oss-download-note a { color: var(--accent); text-decoration: none; }
+    .oss-download-note a:hover { text-decoration: underline; }
+    .oss-download-note code {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 12px;
+      background: var(--bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
     .oss-stats {
       display: flex;
       align-items: center;
@@ -1459,7 +1484,7 @@
     <li><a href="#how-it-works">使用方式</a></li>
     <li><a href="#diff-preview">预览</a></li>
     <li>
-      <a href="https://github.com/your-org/datadiff" class="btn-nav-gh">
+      <a href="https://github.com/Eric4117/DataDiff" class="btn-nav-gh">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/>
         </svg>
@@ -1479,13 +1504,13 @@
     DataDiff 是一款开源的多数据库结构对比工具，支持 MySQL、SQLite、PostgreSQL / Supabase，帮你快速找出两个库之间的表、字段、索引差异，并按目标库方言自动生成迁移 SQL。
   </p>
   <div class="hero-actions">
-    <a href="https://github.com/your-org/datadiff/releases" class="btn-primary">
+    <a href="https://github.com/Eric4117/DataDiff/releases" class="btn-primary" title="GitHub Releases：下载 .dmg / .exe（由发布者上传）">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
       </svg>
       免费下载
     </a>
-    <a href="https://github.com/your-org/datadiff" class="btn-secondary">
+    <a href="https://github.com/Eric4117/DataDiff" class="btn-secondary" title="GitHub 源码仓库">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
         <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/>
       </svg>
@@ -2050,18 +2075,23 @@
     <h2>完全开源，永久免费</h2>
     <p>DataDiff 基于 MIT 协议开源，代码完全透明。欢迎 Star、Fork、提 Issue 或贡献代码。</p>
     <div class="oss-actions">
-      <a href="https://github.com/your-org/datadiff" class="btn-primary">
+      <a href="https://github.com/Eric4117/DataDiff" class="btn-primary">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px">
           <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/>
         </svg>
         GitHub 上查看
       </a>
-      <a href="https://github.com/your-org/datadiff/releases" class="btn-secondary">
+      <a href="https://github.com/Eric4117/DataDiff/releases" class="btn-secondary">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:16px;height:16px">
           <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
         </svg>
         下载最新版
       </a>
+    </div>
+
+    <div class="oss-download-note fade-up">
+      <p><strong style="color:var(--text)">下载使用：</strong>打开 <a href="https://github.com/Eric4117/DataDiff/releases">GitHub Releases</a>，在最新版本的 Assets 中选择 <strong>macOS（.dmg）</strong> 或 <strong>Windows（.exe）</strong> 下载安装即可，<strong>无需安装 Node.js、无需自己编译</strong>。</p>
+      <p><strong style="color:var(--text)">维护者：</strong>将打好的安装包上传到 Releases 后，用户即可直接下载。打包与上传说明见 <a href="https://github.com/Eric4117/DataDiff/blob/main/README.md#从源码运行与开发">README · 从源码运行与开发</a>。</p>
     </div>
 
     <div class="oss-stats">
@@ -2146,10 +2176,10 @@
   </div>
 
   <ul class="footer-links">
-    <li><a href="https://github.com/your-org/datadiff">GitHub</a></li>
-    <li><a href="https://github.com/your-org/datadiff/releases">下载</a></li>
-    <li><a href="https://github.com/your-org/datadiff/issues">反馈问题</a></li>
-    <li><a href="https://github.com/your-org/datadiff/blob/main/LICENSE">许可证</a></li>
+    <li><a href="https://github.com/Eric4117/DataDiff">GitHub</a></li>
+    <li><a href="https://github.com/Eric4117/DataDiff/releases">下载</a></li>
+    <li><a href="https://github.com/Eric4117/DataDiff/issues">反馈问题</a></li>
+    <li><a href="https://github.com/Eric4117/DataDiff/blob/main/LICENSE">许可证</a></li>
   </ul>
 </footer>
 
