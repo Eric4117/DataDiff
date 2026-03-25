@@ -13,7 +13,6 @@
 | **在线访问** | 官网介绍及功能说明：<https://eric4117.github.io/DataDiff/>） |
 | **本地预览** | `npm run landing:preview`，浏览器打开终端里提示的地址（默认 <http://localhost:4173>） |
 
-**首次上线 GitHub Pages：** 仓库 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**。推送 `main` 后工作流 [deploy-landing.yml](.github/workflows/deploy-landing.yml) 会把 `landing/` 目录部署为站点根目录。也可改用 [Netlify](https://www.netlify.com/) / [Cloudflare Pages](https://pages.cloudflare.com/)，将发布目录指向 `landing`。
 
 ## 功能概览
 
