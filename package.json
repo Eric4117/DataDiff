@@ -10,7 +10,8 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "package": "electron-vite build && electron-builder"
+    "package": "electron-vite build && electron-builder",
+    "landing:preview": "npx --yes serve landing -p 4173"
   },
   "dependencies": {
     "better-sqlite3": "^11.6.0",

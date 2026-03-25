@@ -4,6 +4,17 @@
 
 > Desktop app for comparing database **schema** across connections (MySQL / PostgreSQL / SQLite).
 
+## 产品落地页（Landing）
+
+单页介绍与功能说明见仓库内 [`landing/index.html`](./landing/index.html)。
+
+| 方式 | 说明 |
+|------|------|
+| **在线访问** | 启用 GitHub Pages 后：<https://eric4117.github.io/DataDiff/>（若仓库名或用户名不同，请把 `eric4117` / `DataDiff` 换成你的） |
+| **本地预览** | `npm run landing:preview`，浏览器打开终端里提示的地址（默认 <http://localhost:4173>） |
+
+**首次上线 GitHub Pages：** 仓库 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**。推送 `main` 后工作流 [deploy-landing.yml](.github/workflows/deploy-landing.yml) 会把 `landing/` 目录部署为站点根目录。也可改用 [Netlify](https://www.netlify.com/) / [Cloudflare Pages](https://pages.cloudflare.com/)，将发布目录指向 `landing`。
+
 ## 功能概览
 
 - 配置并保存多个数据源连接
