@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import type { TableDiff, DiffFilter, DiffResult, CompareTarget, Connection } from '@/types'
-import { DiffSummaryBar } from './DiffSummaryBar'
+import type { TableDiff, DiffFilter, DiffResult, CompareTarget, Connection, DbType } from '@/types'
 import { ColumnDiffTable } from './ColumnDiffTable'
 import { IndexDiffTable } from './IndexDiffTable'
 import { SqlGeneratorDialog } from './SqlGeneratorDialog'
@@ -26,6 +25,7 @@ interface TableDiffListProps {
   rightTarget: CompareTarget
   connections: Connection[]
   onReset: () => void
+  filter: DiffFilter
 }
 
 const STATUS_CONFIG = {
@@ -60,9 +60,9 @@ export function TableDiffList({
   leftTarget,
   rightTarget,
   connections,
-  onReset
+  onReset,
+  filter
 }: TableDiffListProps) {
-  const [filter, setFilter] = useState<DiffFilter>('different')
   const [search, setSearch] = useState('')
   const [copiedDiff, setCopiedDiff] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(() => {
@@ -75,6 +75,8 @@ export function TableDiffList({
 
   const leftConn = connections.find((c) => c.id === leftTarget.connectionId)
   const rightConn = connections.find((c) => c.id === rightTarget.connectionId)
+  const leftSqlDialect: DbType = leftConn?.type ?? 'mysql'
+  const rightSqlDialect: DbType = rightConn?.type ?? 'mysql'
   const leftLabel = `${leftConn?.name ?? ''} / ${leftTarget.database}`
   const rightLabel = `${rightConn?.name ?? ''} / ${rightTarget.database}`
 
@@ -173,13 +175,6 @@ export function TableDiffList({
         </Button>
       </div>
 
-      {/* 过滤条 */}
-      <DiffSummaryBar
-        summary={result.summary}
-        filter={filter}
-        onFilterChange={setFilter}
-      />
-
       {/* 搜索 + 操作栏 */}
       <div className="flex items-center justify-between gap-3">
         {/* 左：搜索框 */}
@@ -249,6 +244,8 @@ export function TableDiffList({
               rightLabel={rightLabel}
               leftDb={leftTarget.database}
               rightDb={rightTarget.database}
+              leftSqlDialect={leftSqlDialect}
+              rightSqlDialect={rightSqlDialect}
             />
           ))
         )}
@@ -265,9 +262,21 @@ interface TableDiffRowProps {
   rightLabel: string
   leftDb: string
   rightDb: string
+  leftSqlDialect: DbType
+  rightSqlDialect: DbType
 }
 
-function TableDiffRow({ table, expanded, onToggle, leftLabel, rightLabel, leftDb, rightDb }: TableDiffRowProps) {
+function TableDiffRow({
+  table,
+  expanded,
+  onToggle,
+  leftLabel,
+  rightLabel,
+  leftDb,
+  rightDb,
+  leftSqlDialect,
+  rightSqlDialect
+}: TableDiffRowProps) {
   const [sqlOpen, setSqlOpen] = useState(false)
   const cfg = STATUS_CONFIG[table.status]
   const diffColCount = table.columns.filter((c) => c.status !== 'same').length
@@ -347,6 +356,8 @@ function TableDiffRow({ table, expanded, onToggle, leftLabel, rightLabel, leftDb
         rightDb={rightDb}
         leftLabel={leftLabel}
         rightLabel={rightLabel}
+        leftSqlDialect={leftSqlDialect}
+        rightSqlDialect={rightSqlDialect}
       />
 
       {expanded && (

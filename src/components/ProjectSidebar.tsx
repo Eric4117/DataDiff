@@ -11,7 +11,8 @@ interface ProjectSidebarProps {
   onProjectsChange: () => void
 }
 
-export function ProjectSidebar({ projects, activeProjectId, onSelect, onProjectsChange }: ProjectSidebarProps) {
+/** 纯内容（嵌入统一侧栏的 Context 区，无 aside 外壳） */
+export function ProjectSidebarContent({ projects, activeProjectId, onSelect, onProjectsChange }: ProjectSidebarProps) {
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -70,22 +71,22 @@ export function ProjectSidebar({ projects, activeProjectId, onSelect, onProjects
   }
 
   return (
-    <aside className="w-44 shrink-0 border-r flex flex-col bg-muted/20 overflow-hidden">
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-transparent">
       <div className="px-3 pt-4 pb-2 shrink-0">
-        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">项目</span>
+        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">项目</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto px-1.5">
         {/* 全部表 */}
         <button
           onClick={() => onSelect(null)}
-          className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors text-left ${
+          className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors text-left rounded-md ${
             activeProjectId === null
-              ? 'bg-background text-foreground font-medium shadow-sm border-r-2 border-primary'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+              ? 'bg-primary/14 text-primary font-semibold'
+              : 'text-muted-foreground font-medium hover:text-foreground hover:bg-black/[0.06] dark:hover:bg-white/[0.06]'
           }`}
         >
-          <Layers className="h-3.5 w-3.5 shrink-0" />
+          <Layers className={`h-3.5 w-3.5 shrink-0 ${activeProjectId === null ? 'text-primary' : ''}`} />
           <span className="truncate">全部表</span>
         </button>
 
@@ -151,17 +152,21 @@ export function ProjectSidebar({ projects, activeProjectId, onSelect, onProjects
           return (
             <div
               key={p.id}
-              className={`group flex items-center gap-1.5 px-3 py-2 cursor-pointer transition-colors ${
+              className={`group flex items-center gap-1.5 px-3 py-2 cursor-pointer transition-colors rounded-md ${
                 isActive
-                  ? 'bg-background text-foreground font-medium shadow-sm border-r-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                  ? 'bg-primary/14 text-primary font-semibold'
+                  : 'text-muted-foreground font-medium hover:text-foreground hover:bg-black/[0.06] dark:hover:bg-white/[0.06]'
               }`}
               onClick={() => onSelect(p.id)}
             >
-              <FolderOpen className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-amber-500' : ''}`} />
-              <span className="truncate text-sm flex-1 min-w-0">{p.name}</span>
+              <FolderOpen className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-primary' : ''}`} />
+              <span className="truncate text-xs flex-1 min-w-0">{p.name}</span>
               {/* 数量 badge（hover 时隐藏，让出空间给 ··· 按钮）*/}
-              <span className="text-[10px] text-muted-foreground tabular-nums shrink-0 group-hover:hidden">
+              <span
+                className={`text-[10px] tabular-nums shrink-0 group-hover:hidden ${
+                  isActive ? 'text-primary/70' : 'text-muted-foreground'
+                }`}
+              >
                 {p.tables.length}
               </span>
               {/* ··· 更多按钮，hover 才显示 */}
@@ -245,6 +250,15 @@ export function ProjectSidebar({ projects, activeProjectId, onSelect, onProjects
         </div>,
         document.body
       )}
+    </div>
+  )
+}
+
+/** @deprecated 使用 ProjectSidebarContent + 外层布局；保留兼容导出 */
+export function ProjectSidebar(props: ProjectSidebarProps) {
+  return (
+    <aside className="w-44 shrink-0 border-r flex flex-col overflow-hidden">
+      <ProjectSidebarContent {...props} />
     </aside>
   )
 }

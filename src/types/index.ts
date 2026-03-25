@@ -1,10 +1,20 @@
+/** 数据源类型：Supabase 使用 PostgreSQL 协议，选 postgresql */
+export type DbType = 'mysql' | 'sqlite' | 'postgresql'
+
 export interface Connection {
   id: string
   name: string
+  type: DbType
   host: string
   port: number
   user: string
   password: string
+  /** SQLite：数据库文件绝对或相对路径 */
+  filePath?: string
+  /** PostgreSQL：默认库名（列举库、测试连接用，对比时仍可选其他库） */
+  database?: string
+  /** PostgreSQL/Supabase：是否启用 SSL */
+  ssl?: boolean
 }
 
 export interface CompareTarget {

@@ -62,7 +62,7 @@ export function HomePage({ connections, onNavigateCompare, onNavigateStructure }
         <div className="min-w-0">
           <h1 className="text-xl font-bold">DataDiff</h1>
           <p className="text-sm text-muted-foreground mt-1 break-words">
-            MySQL 数据库结构对比工具 — 快速发现两个数据库之间的表、字段、索引差异，并支持查看单库表结构。
+            多数据库结构对比工具 — 支持 MySQL、SQLite、PostgreSQL/Supabase，快速发现两个数据库之间的表、字段、索引差异，并支持查看单库表结构。
           </p>
         </div>
       </div>
@@ -74,7 +74,7 @@ export function HomePage({ connections, onNavigateCompare, onNavigateStructure }
           <FeatureCard
             icon={<GitCompare className="h-4 w-4 text-amber-600" />}
             title="结构对比"
-            desc="逐表、逐字段、逐索引对比两个 MySQL 数据库的结构差异，高亮变更点。"
+            desc="逐表、逐字段、逐索引对比两个数据库的结构差异，支持跨类型对比，高亮变更点。"
             bg="bg-amber-50"
           />
           <FeatureCard
@@ -86,7 +86,7 @@ export function HomePage({ connections, onNavigateCompare, onNavigateStructure }
           <FeatureCard
             icon={<Database className="h-4 w-4 text-green-600" />}
             title="多数据源"
-            desc="本地保存多个 MySQL 连接配置，快速切换，密码不出本机。"
+            desc="本地保存 MySQL、SQLite、PostgreSQL 连接配置，快速切换，密码不出本机。"
             bg="bg-green-50"
           />
         </div>

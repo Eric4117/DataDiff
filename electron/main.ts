@@ -15,7 +15,12 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     autoHideMenuBar: true,
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
+    // macOS 交通灯按钮垂直居中对齐 header（高度 44px → y = 16）
+    ...(process.platform === 'darwin' && {
+      trafficLightPosition: { x: 16, y: 16 }
+    }),
+    backgroundColor: '#ffffff',
     webPreferences: {
       preload: join(__dirname, '../preload/preload.js'),
       sandbox: false,

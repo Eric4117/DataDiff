@@ -4,10 +4,12 @@ import { CompareSelector } from './components/CompareSelector'
 import { TableDiffList } from './components/TableDiffList'
 import { StructureViewer } from './components/StructureViewer'
 import { HomePage } from './components/HomePage'
-import { ProjectSidebar } from './components/ProjectSidebar'
+import { ProjectSidebarContent } from './components/ProjectSidebar'
+import { AppSidebar } from './components/AppSidebar'
 import { TooltipProvider } from './components/ui/tooltip'
-import type { Connection, CompareTarget, DiffResult, Project } from './types'
-import { Database, GitCompare, Loader2, AlertCircle, LayoutGrid, Home } from 'lucide-react'
+import type { Connection, CompareTarget, DiffResult, DiffFilter, Project } from './types'
+import { DiffSummaryBar } from './components/DiffSummaryBar'
+import { Loader2, AlertCircle } from 'lucide-react'
 
 type Tab = 'home' | 'compare' | 'structure' | 'connections'
 
@@ -25,8 +27,9 @@ export default function App() {
   const [compareError, setCompareError] = useState<string | null>(null)
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
+  const [comparePresetNonce, setComparePresetNonce] = useState(0)
+  const [diffFilter, setDiffFilter] = useState<DiffFilter>('different')
 
-  // 快捷跳转预填状态
   const [presetCompare, setPresetCompare] = useState<{ left: CompareTarget; right: CompareTarget } | null>(null)
   const [presetStructure, setPresetStructure] = useState<CompareTarget | null>(null)
 
@@ -40,6 +43,10 @@ export default function App() {
     window.api.connections.list().then(setConnections)
     refreshProjects()
   }, [refreshProjects])
+
+  useEffect(() => {
+    setDiffFilter('different')
+  }, [compareState])
 
   const refreshConnections = useCallback(async () => {
     const list = await window.api.connections.list()
@@ -61,21 +68,20 @@ export default function App() {
     await refreshConnections()
   }
 
-  const handleCompare = async (left: CompareTarget, right: CompareTarget) => {
+  const handleCompare = useCallback(async (left: CompareTarget, right: CompareTarget) => {
     setComparing(true)
     setCompareError(null)
     setCompareState(null)
     try {
       const result = await window.api.schema.compare(left, right)
       setCompareState({ left, right, result })
-      // 自动保存快捷操作
       window.api.shortcuts.upsertCompare(left, right).catch(() => {})
     } catch (err) {
       setCompareError(err instanceof Error ? err.message : '对比失败，请检查连接')
     } finally {
       setComparing(false)
     }
-  }
+  }, [])
 
   const handleStructureLoaded = (connId: string, database: string) => {
     window.api.shortcuts.upsertStructure({ connectionId: connId, database }).catch(() => {})
@@ -86,9 +92,9 @@ export default function App() {
     setCompareError(null)
   }
 
-  // 从首页快捷操作跳转
   const handleNavigateCompare = (left: CompareTarget, right: CompareTarget) => {
     setPresetCompare({ left, right })
+    setComparePresetNonce((n) => n + 1)
     setPresetStructure(null)
     setCompareState(null)
     setCompareError(null)
@@ -101,51 +107,38 @@ export default function App() {
     setTab('structure')
   }
 
+  const structurePanel =
+    connections.length > 0 ? (
+      <ProjectSidebarContent
+        projects={projects}
+        activeProjectId={activeProjectId}
+        onSelect={setActiveProjectId}
+        onProjectsChange={refreshProjects}
+      />
+    ) : null
+
+  const compareFiltersPanel =
+    compareState != null ? (
+      <DiffSummaryBar
+        variant="sidebar"
+        summary={compareState.result.summary}
+        filter={diffFilter}
+        onFilterChange={setDiffFilter}
+      />
+    ) : null
+
   return (
     <TooltipProvider>
-      <div className="flex flex-col h-screen bg-background">
-        {/* 标题栏 */}
-        <header className="flex items-center justify-between px-5 py-3 border-b bg-card shrink-0 select-none"
-          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-        >
-          <div className="flex items-center gap-2.5 shrink-0">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <GitCompare className="h-4 w-4" />
-            </div>
-            <span className="font-semibold text-sm">DataDiff</span>
-            <span className="text-xs text-muted-foreground">MySQL 结构对比</span>
-          </div>
-          {/* 标签切换 */}
-          <div
-            className="flex items-center gap-1 rounded-lg bg-muted p-1"
-            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-          >
-            <TabBtn active={tab === 'home'} onClick={() => setTab('home')}>
-              <Home className="h-3.5 w-3.5" />
-              首页
-            </TabBtn>
-            <TabBtn active={tab === 'compare'} onClick={() => setTab('compare')}>
-              <GitCompare className="h-3.5 w-3.5" />
-              对比
-            </TabBtn>
-            <TabBtn active={tab === 'structure'} onClick={() => setTab('structure')}>
-              <LayoutGrid className="h-3.5 w-3.5" />
-              结构
-            </TabBtn>
-            <TabBtn active={tab === 'connections'} onClick={() => setTab('connections')}>
-              <Database className="h-3.5 w-3.5" />
-              数据源
-              {connections.length > 0 && (
-                <span className="ml-1 text-[10px] font-bold text-muted-foreground">
-                  {connections.length}
-                </span>
-              )}
-            </TabBtn>
-          </div>
-        </header>
+      <div className="flex h-screen bg-background overflow-hidden">
+        <AppSidebar
+          tab={tab}
+          onTabChange={setTab}
+          connectionsCount={connections.length}
+          structurePanel={structurePanel}
+          compareFiltersPanel={compareFiltersPanel}
+        />
 
-        {/* 主内容区 */}
-        <main className="flex-1 overflow-hidden flex flex-col">
+        <main className="flex-1 min-w-0 overflow-hidden flex flex-col">
           {tab === 'home' ? (
             <div className="flex-1 overflow-auto">
               <HomePage
@@ -164,30 +157,21 @@ export default function App() {
               />
             </div>
           ) : tab === 'structure' ? (
-            <div className="flex flex-1 overflow-hidden">
-              <ProjectSidebar
-                projects={projects}
-                activeProjectId={activeProjectId}
-                onSelect={setActiveProjectId}
-                onProjectsChange={refreshProjects}
-              />
-              <div className="flex-1 overflow-auto">
-                <div className="max-w-5xl mx-auto px-6 py-6 flex flex-col gap-6">
-                  <StructureViewer
-                    connections={connections}
-                    initialTarget={presetStructure ?? undefined}
-                    onStructureLoaded={handleStructureLoaded}
-                    activeProjectId={activeProjectId}
-                    activeProject={projects.find((p) => p.id === activeProjectId) ?? null}
-                    onProjectsChange={refreshProjects}
-                  />
-                </div>
+            <div className="flex-1 overflow-auto">
+              <div className="max-w-5xl mx-auto px-6 py-6 flex flex-col gap-6">
+                <StructureViewer
+                  connections={connections}
+                  initialTarget={presetStructure ?? undefined}
+                  onStructureLoaded={handleStructureLoaded}
+                  activeProjectId={activeProjectId}
+                  activeProject={projects.find((p) => p.id === activeProjectId) ?? null}
+                  onProjectsChange={refreshProjects}
+                />
               </div>
             </div>
           ) : (
             <div className="flex-1 overflow-auto">
-            <div className="max-w-5xl mx-auto px-6 py-6 flex flex-col gap-6">
-              {!compareState && !comparing && (
+              <div className="max-w-5xl mx-auto px-6 py-6 flex flex-col gap-6">
                 <section>
                   <h2 className="text-base font-semibold mb-4">选择对比数据库</h2>
                   <CompareSelector
@@ -195,65 +179,42 @@ export default function App() {
                     onCompare={handleCompare}
                     comparing={comparing}
                     initialPreset={presetCompare ?? undefined}
+                    presetNonce={comparePresetNonce}
                   />
-                  {compareError && (
-                    <div className="mt-4 flex items-start gap-2 rounded-lg border border-destructive/50 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                      <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                      <span>{compareError}</span>
-                    </div>
-                  )}
                 </section>
-              )}
 
-              {comparing && (
-                <div className="flex flex-col items-center justify-center py-24 gap-4">
-                  <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                  <div className="text-center">
-                    <p className="font-medium">正在扫描数据库结构...</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      正在查询 information_schema，请稍候
-                    </p>
+                {compareError && (
+                  <div className="flex items-start gap-2 rounded-lg border border-destructive/50 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>{compareError}</span>
                   </div>
-                </div>
-              )}
+                )}
 
-              {compareState && (
-                <TableDiffList
-                  result={compareState.result}
-                  leftTarget={compareState.left}
-                  rightTarget={compareState.right}
-                  connections={connections}
-                  onReset={handleReset}
-                />
-              )}
-            </div>
+                {comparing && (
+                  <div className="flex flex-col items-center justify-center py-24 gap-4">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <div className="text-center">
+                      <p className="font-medium">正在扫描数据库结构...</p>
+                      <p className="text-sm text-muted-foreground mt-1">正在读取元数据，请稍候</p>
+                    </div>
+                  </div>
+                )}
+
+                {compareState && (
+                  <TableDiffList
+                    result={compareState.result}
+                    leftTarget={compareState.left}
+                    rightTarget={compareState.right}
+                    connections={connections}
+                    onReset={handleReset}
+                    filter={diffFilter}
+                  />
+                )}
+              </div>
             </div>
           )}
         </main>
       </div>
     </TooltipProvider>
-  )
-}
-
-function TabBtn({
-  active,
-  onClick,
-  children
-}: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-        active
-          ? 'bg-background text-foreground shadow-sm'
-          : 'text-muted-foreground hover:text-foreground'
-      }`}
-    >
-      {children}
-    </button>
   )
 }

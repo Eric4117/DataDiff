@@ -154,7 +154,9 @@ export function StructureViewer({
     if (!connId) { setDatabases([]); return }
     // 命中缓存直接用
     if (databasesCacheRef.current.has(connId)) {
-      setDatabases(databasesCacheRef.current.get(connId)!)
+      const cached = databasesCacheRef.current.get(connId)!
+      setDatabases(cached)
+      if (cached.length === 1) setDatabase(cached[0])
       return
     }
     setLoadingDbs(true)
@@ -162,6 +164,7 @@ export function StructureViewer({
       const dbs = await window.api.schema.databases(connId)
       databasesCacheRef.current.set(connId, dbs)
       setDatabases(dbs)
+      if (dbs.length === 1) setDatabase(dbs[0])
     } catch (err) {
       setDatabases([])
       setLoadError(err instanceof Error ? err.message : '加载失败')
@@ -350,7 +353,13 @@ export function StructureViewer({
                       {connections.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
                           {c.name}
-                          <span className="ml-1 text-xs text-muted-foreground">({c.user}@{c.host})</span>
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            (
+                            {(c.type ?? 'mysql') === 'sqlite'
+                              ? (c.filePath || 'SQLite').slice(0, 36) + (c.filePath && c.filePath.length > 36 ? '…' : '')
+                              : `${c.user}@${c.host}`}
+                            )
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectContent>

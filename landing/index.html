@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DataDiff — MySQL 数据库结构对比工具</title>
-  <meta name="description" content="DataDiff 是一款开源的 MySQL 数据库结构对比桌面工具，帮助你快速发现两个数据库之间的表、字段、索引差异，并生成 ALTER SQL。" />
+  <title>DataDiff — 多数据库结构对比工具</title>
+  <meta name="description" content="DataDiff 是一款开源的多数据库结构对比桌面工具，支持 MySQL、SQLite、PostgreSQL / Supabase，帮助你快速发现两个库之间的表、字段、索引差异，并按目标库方言生成迁移 SQL。" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -52,6 +52,89 @@
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
       pointer-events: none;
       z-index: 0;
+    }
+
+    /* ========== ANIMATED DOT GRID ========== */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: -40px;
+      background-image: radial-gradient(circle, rgba(13,148,136,0.18) 1px, transparent 1px);
+      background-size: 40px 40px;
+      animation: dotDrift 50s linear infinite;
+      pointer-events: none;
+      z-index: 0;
+      mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+    }
+
+    @keyframes dotDrift {
+      from { background-position: 0 0; }
+      to   { background-position: 40px 40px; }
+    }
+
+    /* ========== FLOATING ORBS ========== */
+    .bg-orbs {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .bg-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+    }
+
+    .bg-orb-1 {
+      width: 700px; height: 700px;
+      top: -220px; left: -180px;
+      background: radial-gradient(circle, rgba(13,148,136,0.22) 0%, transparent 70%);
+      animation: orbFloat1 28s ease-in-out infinite;
+    }
+
+    .bg-orb-2 {
+      width: 550px; height: 550px;
+      top: 25%; right: -180px;
+      background: radial-gradient(circle, rgba(59,130,246,0.14) 0%, transparent 70%);
+      animation: orbFloat2 34s ease-in-out infinite;
+      animation-delay: -10s;
+    }
+
+    .bg-orb-3 {
+      width: 500px; height: 500px;
+      bottom: -120px; left: 28%;
+      background: radial-gradient(circle, rgba(16,185,129,0.13) 0%, transparent 70%);
+      animation: orbFloat3 40s ease-in-out infinite;
+      animation-delay: -20s;
+    }
+
+    .bg-orb-4 {
+      width: 300px; height: 300px;
+      top: 55%; left: 10%;
+      background: radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%);
+      animation: orbFloat1 22s ease-in-out infinite;
+      animation-delay: -6s;
+    }
+
+    @keyframes orbFloat1 {
+      0%,100% { transform: translate(0,0) scale(1); }
+      33%     { transform: translate(40px,-30px) scale(1.06); }
+      66%     { transform: translate(-25px,35px) scale(0.94); }
+    }
+
+    @keyframes orbFloat2 {
+      0%,100% { transform: translate(0,0) scale(1); }
+      40%     { transform: translate(-35px,25px) scale(1.08); }
+      70%     { transform: translate(30px,-40px) scale(0.92); }
+    }
+
+    @keyframes orbFloat3 {
+      0%,100% { transform: translate(0,0) scale(1); }
+      30%     { transform: translate(50px,20px) scale(1.04); }
+      60%     { transform: translate(-30px,-30px) scale(0.97); }
     }
 
     /* ========== NAV ========== */
@@ -148,12 +231,18 @@
     .hero::after {
       content: '';
       position: absolute;
-      top: 15%;
+      top: 10%;
       left: 50%;
       transform: translateX(-50%);
-      width: 700px; height: 500px;
-      background: radial-gradient(ellipse at center, rgba(13,148,136,0.15) 0%, transparent 70%);
+      width: 800px; height: 600px;
+      background: radial-gradient(ellipse at center, rgba(13,148,136,0.18) 0%, rgba(6,182,212,0.08) 40%, transparent 70%);
       pointer-events: none;
+      animation: heroGlow 8s ease-in-out infinite;
+    }
+
+    @keyframes heroGlow {
+      0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
+      50%       { opacity: 0.7; transform: translateX(-50%) scale(1.12); }
     }
 
     .hero-badge {
@@ -179,12 +268,16 @@
       width: 6px; height: 6px;
       border-radius: 50%;
       background: #5eead4;
-      animation: pulse 2s infinite;
+      position: relative;
+      flex-shrink: 0;
+      animation: pulseRing 2s ease-out infinite;
+      box-shadow: 0 0 0 0 rgba(94,234,212,0.6);
     }
 
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+    @keyframes pulseRing {
+      0%   { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(94,234,212,0.6); }
+      70%  { opacity: 0.7; transform: scale(0.9); box-shadow: 0 0 0 5px rgba(94,234,212,0); }
+      100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(94,234,212,0); }
     }
 
     .hero-title {
@@ -1343,6 +1436,14 @@
 </head>
 <body>
 
+<!-- BACKGROUND ORBS -->
+<div class="bg-orbs" aria-hidden="true">
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <div class="bg-orb bg-orb-3"></div>
+  <div class="bg-orb bg-orb-4"></div>
+</div>
+
 <!-- NAV -->
 <nav>
   <a href="#" class="nav-logo">
@@ -1375,7 +1476,7 @@
     数据库结构差异<br /><span>一目了然</span>
   </h1>
   <p class="hero-subtitle">
-    DataDiff 是一款开源的 MySQL 数据库结构对比工具，帮你快速找出两个库之间的表、字段、索引差异，并自动生成迁移 SQL。
+    DataDiff 是一款开源的多数据库结构对比工具，支持 MySQL、SQLite、PostgreSQL / Supabase，帮你快速找出两个库之间的表、字段、索引差异，并按目标库方言自动生成迁移 SQL。
   </p>
   <div class="hero-actions">
     <a href="https://github.com/your-org/datadiff/releases" class="btn-primary">
@@ -1399,7 +1500,7 @@
       <div class="window-dots">
         <span></span><span></span><span></span>
       </div>
-      <span class="window-title">DataDiff — MySQL 结构对比</span>
+      <span class="window-title">DataDiff — 多数据库结构对比</span>
     </div>
 
     <!-- App header (light) -->
@@ -1409,7 +1510,7 @@
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4 4 4M17 8v12m0 0 4-4m-4 4-4-4"/></svg>
         </div>
         <span class="window-logo-name">DataDiff</span>
-        <span class="window-logo-sub">MySQL 结构对比</span>
+        <span class="window-logo-sub">多数据库结构对比</span>
       </div>
       <div class="window-nav-tabs">
         <div class="window-tab">
@@ -1552,8 +1653,19 @@
         </svg>
       </div>
       <h3>精准结构对比</h3>
-      <p>逐表、逐字段、逐索引对比两个 MySQL 数据库的结构差异，高亮每一处变更，不放过任何细节。</p>
+      <p>逐表、逐字段、逐索引对比 MySQL、PostgreSQL、SQLite 数据库的结构差异，支持跨类型对比，高亮每一处变更。</p>
       <span class="feature-tag">Tables · Columns · Indexes</span>
+    </div>
+
+    <div class="feature-card fade-up">
+      <div class="feature-icon icon-green">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375" />
+        </svg>
+      </div>
+      <h3>多数据库支持</h3>
+      <p>原生支持 MySQL / MariaDB、SQLite 本地文件、PostgreSQL 及 Supabase 云数据库，同类或跨类均可对比。</p>
+      <span class="feature-tag">MySQL · SQLite · PostgreSQL</span>
     </div>
 
     <div class="feature-card fade-up">
@@ -1585,7 +1697,7 @@
         </svg>
       </div>
       <h3>多数据源管理</h3>
-      <p>本地安全存储多个 MySQL 连接配置，密码不离开你的电脑。快速切换开发、测试、生产环境。</p>
+      <p>本地安全存储 MySQL、PostgreSQL（含 Supabase）、SQLite 连接配置，密码不离开你的电脑。快速切换开发、测试、生产环境。</p>
       <span class="feature-tag">本地加密存储</span>
     </div>
 
@@ -1599,6 +1711,28 @@
       <h3>快捷操作记录</h3>
       <p>每次对比或查看记录会自动保存为快捷操作，下次一键启动，无需重新配置。</p>
       <span class="feature-tag">一键复现 · 历史记录</span>
+    </div>
+
+    <div class="feature-card fade-up">
+      <div class="feature-icon icon-blue">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44z" />
+        </svg>
+      </div>
+      <h3>表分组 · 业务聚焦</h3>
+      <p>跨库自由选取若干张表组成业务分组，对比和浏览时只看当前业务单元，不被无关表干扰。</p>
+      <span class="feature-tag">自定义分组 · 业务视图</span>
+    </div>
+
+    <div class="feature-card fade-up">
+      <div class="feature-icon icon-purple">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+        </svg>
+      </div>
+      <h3>导出 ER 图</h3>
+      <p>一键将当前数据库的表关系可视化为 ER 图并导出，方便文档沉淀与团队协作评审。</p>
+      <span class="feature-tag">ER 图 · 可视化导出</span>
     </div>
 
     <div class="feature-card fade-up">
@@ -1628,7 +1762,7 @@
     <div class="step">
       <div class="step-num">01</div>
       <h3>添加数据库连接</h3>
-      <p>在「数据源」页面添加你的 MySQL 连接信息，支持添加多个环境（开发 / 测试 / 生产）。</p>
+      <p>在「数据源」页面添加 MySQL、SQLite 文件路径或 PostgreSQL / Supabase 连接信息，支持多环境（开发 / 测试 / 生产）。</p>
     </div>
     <div class="step">
       <div class="step-num">02</div>
@@ -1668,7 +1802,7 @@
         <span class="traffic-dot tmin"></span>
         <span class="traffic-dot tmax"></span>
       </div>
-      <span class="app-titlebar-label">DataDiff — MySQL 结构对比</span>
+      <span class="app-titlebar-label">DataDiff — 多数据库结构对比</span>
     </div>
 
     <!-- App body (light theme) -->
@@ -1681,7 +1815,7 @@
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4 4 4M17 8v12m0 0 4-4m-4 4-4-4"/></svg>
           </div>
           <span class="app-logo-name">DataDiff</span>
-          <span class="app-logo-sub">MySQL 结构对比</span>
+          <span class="app-logo-sub">多数据库结构对比</span>
         </div>
         <div class="app-nav-tabs">
           <div class="app-tab">
@@ -1940,7 +2074,7 @@
         <div class="oss-stat-label">支持平台</div>
       </div>
       <div class="oss-stat">
-        <div class="oss-stat-num">MySQL</div>
+        <div class="oss-stat-num">MySQL · SQLite · PG</div>
         <div class="oss-stat-label">数据库支持</div>
       </div>
       <div class="oss-stat">
@@ -1973,6 +2107,18 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 2.438c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
         </svg>
         MySQL 5.7 / 8.x
+      </div>
+      <div class="platform-badge">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75a3.375 3.375 0 0 0-3.375 3.375V18a2.25 2.25 0 0 0 2.25 2.25h10.5A2.25 2.25 0 0 0 19.5 18v-3.75z" />
+        </svg>
+        SQLite 3
+      </div>
+      <div class="platform-badge">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375" />
+        </svg>
+        PostgreSQL / Supabase
       </div>
       <div class="platform-badge">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">

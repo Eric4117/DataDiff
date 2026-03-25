@@ -6,7 +6,7 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { Button } from './ui/button'
-import type { TableDiff, ColumnDiff, IndexDiff, ColumnInfo, IndexInfo } from '@/types'
+import type { TableDiff, ColumnDiff, IndexDiff, ColumnInfo, IndexInfo, DbType } from '@/types'
 import { Copy, Check, AlertTriangle, Code2, ArrowRight } from 'lucide-react'
 
 export type SqlDirection = 'left_to_right' | 'right_to_left'
@@ -19,11 +19,15 @@ interface SqlGeneratorDialogProps {
   rightDb: string
   leftLabel: string
   rightLabel: string
+  /** 左侧数据源类型，用于按目标库方言生成 SQL */
+  leftSqlDialect: DbType
+  rightSqlDialect: DbType
 }
 
 // ─── SQL 生成辅助函数 ─────────────────────────────────────
 
-function escapeId(name: string): string {
+function escapeId(name: string, dialect: DbType): string {
+  if (dialect === 'postgresql') return `"${name.replace(/"/g, '""')}"`
   return `\`${name.replace(/`/g, '``')}\``
 }
 
@@ -31,40 +35,53 @@ function escapeStr(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
 }
 
-function buildColumnDef(col: ColumnInfo): string {
-  let def = `${escapeId(col.name)} ${col.type}`
-  if (col.charset) def += ` CHARACTER SET ${col.charset}`
-  if (col.collation) def += ` COLLATE ${col.collation}`
+function buildColumnDef(col: ColumnInfo, dialect: DbType): string {
+  const q = (n: string) => escapeId(n, dialect)
+  let def = `${q(col.name)} ${col.type}`
+  if (dialect === 'mysql') {
+    if (col.charset) def += ` CHARACTER SET ${col.charset}`
+    if (col.collation) def += ` COLLATE ${col.collation}`
+  }
   def += col.nullable ? ' NULL' : ' NOT NULL'
 
   if (col.default !== null && col.default !== undefined) {
     const isRaw =
-      /^(tiny|small|medium|big)?int|^float|^double|^decimal|^numeric|^bit/i.test(col.type) ||
-      /^(CURRENT_TIMESTAMP|NULL|TRUE|FALSE)$/i.test(col.default) ||
+      /^(tiny|small|medium|big)?int|^float|^double|^decimal|^numeric|^bit|^serial|^bigserial|^smallserial|^boolean|^bool/i.test(
+        col.type
+      ) ||
+      /^(CURRENT_TIMESTAMP|NULL|TRUE|FALSE|now\(\))$/i.test(col.default) ||
       /\(/.test(col.default)
-    def += isRaw
-      ? ` DEFAULT ${col.default}`
-      : ` DEFAULT '${escapeStr(col.default)}'`
+    def += isRaw ? ` DEFAULT ${col.default}` : ` DEFAULT '${escapeStr(col.default)}'`
   }
 
-  if (col.extra) def += ` ${col.extra.toUpperCase()}`
-  if (col.comment) def += ` COMMENT '${escapeStr(col.comment)}'`
+  if (dialect === 'mysql' && col.extra) def += ` ${col.extra.toUpperCase()}`
+  if (dialect === 'mysql' && col.comment) def += ` COMMENT '${escapeStr(col.comment)}'`
   return def
 }
 
-function buildIndexAddClause(idx: IndexInfo): string {
-  const cols = idx.columns.map(escapeId).join(', ')
+function buildMysqlIndexAddClause(idx: IndexInfo): string {
+  const cols = idx.columns.map((c) => escapeId(c, 'mysql')).join(', ')
   if (idx.name === 'PRIMARY') return `ADD PRIMARY KEY (${cols})`
   const unique = idx.unique ? 'UNIQUE ' : ''
   const using = idx.type && idx.type.toUpperCase() !== 'BTREE' ? ` USING ${idx.type}` : ''
-  return `ADD ${unique}INDEX ${escapeId(idx.name)} (${cols})${using}`
+  return `ADD ${unique}INDEX ${escapeId(idx.name, 'mysql')} (${cols})${using}`
 }
 
-function buildIndexDropClause(name: string): string {
-  return name === 'PRIMARY' ? 'DROP PRIMARY KEY' : `DROP INDEX ${escapeId(name)}`
+function buildMysqlIndexDropClause(name: string): string {
+  return name === 'PRIMARY' ? 'DROP PRIMARY KEY' : `DROP INDEX ${escapeId(name, 'mysql')}`
 }
 
-function generateAlterSql(
+function headerUseDb(targetDb: string, dialect: DbType): string[] {
+  if (dialect === 'mysql') {
+    return [`USE ${escapeId(targetDb, 'mysql')};`, '']
+  }
+  if (dialect === 'postgresql') {
+    return [`-- 目标数据库: ${targetDb}（请先 \\connect ${targetDb} 或在客户端选中该库）`, '']
+  }
+  return [`-- SQLite 单文件库，无需 USE；以下为逻辑库名参考: ${targetDb}`, '']
+}
+
+function generateAlterSqlMysql(
   tableName: string,
   targetDb: string,
   table: TableDiff,
@@ -76,44 +93,41 @@ function generateAlterSql(
   const isLTR = direction === 'left_to_right'
   const clauses: string[] = []
 
-  // 字段变更
   for (const col of table.columns) {
     if (!selectedCols.has(col.name) || col.status === 'same') continue
     if (isLTR) {
-      if (col.status === 'left_only') clauses.push(`  ADD COLUMN ${buildColumnDef(col.left!)}`)
-      else if (col.status === 'right_only') clauses.push(`  DROP COLUMN ${escapeId(col.name)}`)
-      else if (col.status === 'modified') clauses.push(`  MODIFY COLUMN ${buildColumnDef(col.left!)}`)
+      if (col.status === 'left_only') clauses.push(`  ADD COLUMN ${buildColumnDef(col.left!, 'mysql')}`)
+      else if (col.status === 'right_only') clauses.push(`  DROP COLUMN ${escapeId(col.name, 'mysql')}`)
+      else if (col.status === 'modified') clauses.push(`  MODIFY COLUMN ${buildColumnDef(col.left!, 'mysql')}`)
     } else {
-      if (col.status === 'right_only') clauses.push(`  ADD COLUMN ${buildColumnDef(col.right!)}`)
-      else if (col.status === 'left_only') clauses.push(`  DROP COLUMN ${escapeId(col.name)}`)
-      else if (col.status === 'modified') clauses.push(`  MODIFY COLUMN ${buildColumnDef(col.right!)}`)
+      if (col.status === 'right_only') clauses.push(`  ADD COLUMN ${buildColumnDef(col.right!, 'mysql')}`)
+      else if (col.status === 'left_only') clauses.push(`  DROP COLUMN ${escapeId(col.name, 'mysql')}`)
+      else if (col.status === 'modified') clauses.push(`  MODIFY COLUMN ${buildColumnDef(col.right!, 'mysql')}`)
     }
   }
 
-  // 索引变更（先 DROP 再 ADD）
   const dropIdxClauses: string[] = []
   const addIdxClauses: string[] = []
   for (const idx of table.indexes) {
     if (!selectedIdxs.has(idx.name) || idx.status === 'same') continue
     if (isLTR) {
-      if (idx.status === 'left_only') addIdxClauses.push(`  ${buildIndexAddClause(idx.left!)}`)
-      else if (idx.status === 'right_only') dropIdxClauses.push(`  ${buildIndexDropClause(idx.name)}`)
+      if (idx.status === 'left_only') addIdxClauses.push(`  ${buildMysqlIndexAddClause(idx.left!)}`)
+      else if (idx.status === 'right_only') dropIdxClauses.push(`  ${buildMysqlIndexDropClause(idx.name)}`)
       else if (idx.status === 'modified') {
-        dropIdxClauses.push(`  ${buildIndexDropClause(idx.name)}`)
-        addIdxClauses.push(`  ${buildIndexAddClause(idx.left!)}`)
+        dropIdxClauses.push(`  ${buildMysqlIndexDropClause(idx.name)}`)
+        addIdxClauses.push(`  ${buildMysqlIndexAddClause(idx.left!)}`)
       }
     } else {
-      if (idx.status === 'right_only') addIdxClauses.push(`  ${buildIndexAddClause(idx.right!)}`)
-      else if (idx.status === 'left_only') dropIdxClauses.push(`  ${buildIndexDropClause(idx.name)}`)
+      if (idx.status === 'right_only') addIdxClauses.push(`  ${buildMysqlIndexAddClause(idx.right!)}`)
+      else if (idx.status === 'left_only') dropIdxClauses.push(`  ${buildMysqlIndexDropClause(idx.name)}`)
       else if (idx.status === 'modified') {
-        dropIdxClauses.push(`  ${buildIndexDropClause(idx.name)}`)
-        addIdxClauses.push(`  ${buildIndexAddClause(idx.right!)}`)
+        dropIdxClauses.push(`  ${buildMysqlIndexDropClause(idx.name)}`)
+        addIdxClauses.push(`  ${buildMysqlIndexAddClause(idx.right!)}`)
       }
     }
   }
   clauses.push(...dropIdxClauses, ...addIdxClauses)
 
-  // 表属性变更
   for (const meta of table.metaDiffs) {
     if (!selectedMeta.has(meta.field)) continue
     const value = isLTR ? meta.left : meta.right
@@ -127,13 +141,303 @@ function generateAlterSql(
   if (clauses.length === 0) return '-- 未选择任何变更项'
 
   const lines: string[] = [
-    `USE ${escapeId(targetDb)};`,
-    '',
+    ...headerUseDb(targetDb, 'mysql'),
     `-- ${tableName}（${clauses.length} 处变更）`,
-    `ALTER TABLE ${escapeId(tableName)}`,
+    `ALTER TABLE ${escapeId(tableName, 'mysql')}`,
   ]
   clauses.forEach((c, i) => lines.push(c + (i < clauses.length - 1 ? ',' : ';')))
   return lines.join('\n')
+}
+
+function generateAlterSqlPostgresql(
+  tableName: string,
+  targetDb: string,
+  table: TableDiff,
+  direction: SqlDirection,
+  selectedCols: Set<string>,
+  selectedIdxs: Set<string>,
+  selectedMeta: Set<string>
+): string {
+  const isLTR = direction === 'left_to_right'
+  const t = escapeId(tableName, 'postgresql')
+  const stmts: string[] = []
+
+  for (const col of table.columns) {
+    if (!selectedCols.has(col.name) || col.status === 'same') continue
+    if (isLTR) {
+      if (col.status === 'left_only') {
+        stmts.push(`ALTER TABLE ${t} ADD COLUMN ${buildColumnDef(col.left!, 'postgresql')};`)
+      } else if (col.status === 'right_only') {
+        stmts.push(`ALTER TABLE ${t} DROP COLUMN ${escapeId(col.name, 'postgresql')};`)
+      } else if (col.status === 'modified' && col.left && col.right) {
+        const cq = escapeId(col.name, 'postgresql')
+        if (col.left.type !== col.right.type) {
+          stmts.push(`ALTER TABLE ${t} ALTER COLUMN ${cq} TYPE ${col.left.type};`)
+        }
+        if (col.left.nullable !== col.right.nullable) {
+          stmts.push(`ALTER TABLE ${t} ALTER COLUMN ${cq} ${col.left.nullable ? 'DROP NOT NULL' : 'SET NOT NULL'};`)
+        }
+        const lDef = col.left.default
+        const rDef = col.right.default
+        if (lDef !== rDef) {
+          stmts.push(
+            lDef !== null && lDef !== undefined
+              ? `ALTER TABLE ${t} ALTER COLUMN ${cq} SET DEFAULT ${lDef};`
+              : `ALTER TABLE ${t} ALTER COLUMN ${cq} DROP DEFAULT;`
+          )
+        }
+        if (col.left.comment !== col.right.comment) {
+          stmts.push(
+            col.left.comment
+              ? `COMMENT ON COLUMN ${t}.${cq} IS '${escapeStr(col.left.comment)}';`
+              : `COMMENT ON COLUMN ${t}.${cq} IS NULL;`
+          )
+        }
+      }
+    } else {
+      if (col.status === 'right_only') {
+        stmts.push(`ALTER TABLE ${t} ADD COLUMN ${buildColumnDef(col.right!, 'postgresql')};`)
+      } else if (col.status === 'left_only') {
+        stmts.push(`ALTER TABLE ${t} DROP COLUMN ${escapeId(col.name, 'postgresql')};`)
+      } else if (col.status === 'modified' && col.left && col.right) {
+        const cq = escapeId(col.name, 'postgresql')
+        if (col.right.type !== col.left.type) {
+          stmts.push(`ALTER TABLE ${t} ALTER COLUMN ${cq} TYPE ${col.right.type};`)
+        }
+        if (col.right.nullable !== col.left.nullable) {
+          stmts.push(`ALTER TABLE ${t} ALTER COLUMN ${cq} ${col.right.nullable ? 'DROP NOT NULL' : 'SET NOT NULL'};`)
+        }
+        const lDef = col.left.default
+        const rDef = col.right.default
+        if (rDef !== lDef) {
+          stmts.push(
+            rDef !== null && rDef !== undefined
+              ? `ALTER TABLE ${t} ALTER COLUMN ${cq} SET DEFAULT ${rDef};`
+              : `ALTER TABLE ${t} ALTER COLUMN ${cq} DROP DEFAULT;`
+          )
+        }
+        if (col.right.comment !== col.left.comment) {
+          stmts.push(
+            col.right.comment
+              ? `COMMENT ON COLUMN ${t}.${cq} IS '${escapeStr(col.right.comment)}';`
+              : `COMMENT ON COLUMN ${t}.${cq} IS NULL;`
+          )
+        }
+      }
+    }
+  }
+
+  for (const idx of table.indexes) {
+    if (!selectedIdxs.has(idx.name) || idx.status === 'same') continue
+    const addIdx = isLTR ? idx.left : idx.right
+    const dropName = idx.name
+    const colsOf = (info: IndexInfo) => info.columns.map((c) => escapeId(c, 'postgresql')).join(', ')
+
+    if (isLTR) {
+      if (idx.status === 'left_only' && addIdx) {
+        if (addIdx.name === 'PRIMARY') {
+          stmts.push(`ALTER TABLE ${t} ADD PRIMARY KEY (${colsOf(addIdx)});`)
+        } else {
+          const u = addIdx.unique ? 'UNIQUE ' : ''
+          stmts.push(
+            `CREATE ${u}INDEX ${escapeId(addIdx.name, 'postgresql')} ON ${t} (${colsOf(addIdx)});`
+          )
+        }
+      } else if (idx.status === 'right_only') {
+        if (dropName === 'PRIMARY') {
+          const cname = escapeId(`${tableName}_pkey`, 'postgresql')
+          stmts.push(`ALTER TABLE ${t} DROP CONSTRAINT IF EXISTS ${cname};`)
+        } else {
+          stmts.push(`DROP INDEX IF EXISTS ${escapeId(dropName, 'postgresql')};`)
+        }
+      } else if (idx.status === 'modified' && idx.left) {
+        if (dropName === 'PRIMARY') {
+          stmts.push(`ALTER TABLE ${t} DROP CONSTRAINT IF EXISTS ${escapeId(`${tableName}_pkey`, 'postgresql')};`)
+          stmts.push(`ALTER TABLE ${t} ADD PRIMARY KEY (${colsOf(idx.left)});`)
+        } else {
+          stmts.push(`DROP INDEX IF EXISTS ${escapeId(dropName, 'postgresql')};`)
+          const u = idx.left.unique ? 'UNIQUE ' : ''
+          stmts.push(
+            `CREATE ${u}INDEX ${escapeId(idx.left.name, 'postgresql')} ON ${t} (${colsOf(idx.left)});`
+          )
+        }
+      }
+    } else {
+      if (idx.status === 'right_only' && addIdx) {
+        if (addIdx.name === 'PRIMARY') {
+          stmts.push(`ALTER TABLE ${t} ADD PRIMARY KEY (${colsOf(addIdx)});`)
+        } else {
+          const u = addIdx.unique ? 'UNIQUE ' : ''
+          stmts.push(
+            `CREATE ${u}INDEX ${escapeId(addIdx.name, 'postgresql')} ON ${t} (${colsOf(addIdx)});`
+          )
+        }
+      } else if (idx.status === 'left_only') {
+        if (dropName === 'PRIMARY') {
+          stmts.push(`ALTER TABLE ${t} DROP CONSTRAINT IF EXISTS ${escapeId(`${tableName}_pkey`, 'postgresql')};`)
+        } else {
+          stmts.push(`DROP INDEX IF EXISTS ${escapeId(dropName, 'postgresql')};`)
+        }
+      } else if (idx.status === 'modified' && idx.right) {
+        if (dropName === 'PRIMARY') {
+          stmts.push(`ALTER TABLE ${t} DROP CONSTRAINT IF EXISTS ${escapeId(`${tableName}_pkey`, 'postgresql')};`)
+          stmts.push(`ALTER TABLE ${t} ADD PRIMARY KEY (${colsOf(idx.right)});`)
+        } else {
+          stmts.push(`DROP INDEX IF EXISTS ${escapeId(dropName, 'postgresql')};`)
+          const u = idx.right.unique ? 'UNIQUE ' : ''
+          stmts.push(
+            `CREATE ${u}INDEX ${escapeId(idx.right.name, 'postgresql')} ON ${t} (${colsOf(idx.right)});`
+          )
+        }
+      }
+    }
+  }
+
+  for (const meta of table.metaDiffs) {
+    if (!selectedMeta.has(meta.field)) continue
+    const value = isLTR ? meta.left : meta.right
+    if (meta.field === 'comment' && value) {
+      stmts.push(`COMMENT ON TABLE ${t} IS '${escapeStr(value)}';`)
+    }
+  }
+
+  if (stmts.length === 0) return '-- 未选择任何变更项'
+
+  return [...headerUseDb(targetDb, 'postgresql'), `-- ${tableName}`, ...stmts].join('\n')
+}
+
+function generateAlterSqlSqlite(
+  tableName: string,
+  targetDb: string,
+  table: TableDiff,
+  direction: SqlDirection,
+  selectedCols: Set<string>,
+  selectedIdxs: Set<string>,
+  selectedMeta: Set<string>
+): string {
+  const isLTR = direction === 'left_to_right'
+  const t = escapeId(tableName, 'mysql')
+  const stmts: string[] = []
+
+  for (const col of table.columns) {
+    if (!selectedCols.has(col.name) || col.status === 'same') continue
+    if (isLTR) {
+      if (col.status === 'left_only') {
+        stmts.push(`ALTER TABLE ${t} ADD COLUMN ${buildColumnDef(col.left!, 'mysql')};`)
+      } else if (col.status === 'right_only') {
+        stmts.push(`ALTER TABLE ${t} DROP COLUMN ${escapeId(col.name, 'mysql')};`)
+      } else if (col.status === 'modified') {
+        stmts.push(
+          `-- SQLite 无法直接 MODIFY 列 "${col.name}"，请使用表重建或迁移工具同步类型/约束`
+        )
+      }
+    } else {
+      if (col.status === 'right_only') {
+        stmts.push(`ALTER TABLE ${t} ADD COLUMN ${buildColumnDef(col.right!, 'mysql')};`)
+      } else if (col.status === 'left_only') {
+        stmts.push(`ALTER TABLE ${t} DROP COLUMN ${escapeId(col.name, 'mysql')};`)
+      } else if (col.status === 'modified') {
+        stmts.push(
+          `-- SQLite 无法直接 MODIFY 列 "${col.name}"，请使用表重建或迁移工具同步类型/约束`
+        )
+      }
+    }
+  }
+
+  for (const idx of table.indexes) {
+    if (!selectedIdxs.has(idx.name) || idx.status === 'same') continue
+    const addIdx = isLTR ? idx.left : idx.right
+    const colsOf = (info: IndexInfo) => info.columns.map((c) => escapeId(c, 'mysql')).join(', ')
+    if (idx.name === 'PRIMARY') {
+      stmts.push(`-- 主键变更（${idx.name}）请在 SQLite 中手动处理`)
+      continue
+    }
+    if (isLTR) {
+      if (idx.status === 'left_only' && addIdx) {
+        const u = addIdx.unique ? 'UNIQUE ' : ''
+        stmts.push(
+          `CREATE ${u}INDEX ${escapeId(addIdx.name, 'mysql')} ON ${t} (${colsOf(addIdx)});`
+        )
+      } else if (idx.status === 'right_only') {
+        stmts.push(`DROP INDEX IF EXISTS ${escapeId(idx.name, 'mysql')};`)
+      } else if (idx.status === 'modified' && idx.left) {
+        stmts.push(`DROP INDEX IF EXISTS ${escapeId(idx.name, 'mysql')};`)
+        const u = idx.left.unique ? 'UNIQUE ' : ''
+        stmts.push(
+          `CREATE ${u}INDEX ${escapeId(idx.left.name, 'mysql')} ON ${t} (${colsOf(idx.left)});`
+        )
+      }
+    } else {
+      if (idx.status === 'right_only' && addIdx) {
+        const u = addIdx.unique ? 'UNIQUE ' : ''
+        stmts.push(
+          `CREATE ${u}INDEX ${escapeId(addIdx.name, 'mysql')} ON ${t} (${colsOf(addIdx)});`
+        )
+      } else if (idx.status === 'left_only') {
+        stmts.push(`DROP INDEX IF EXISTS ${escapeId(idx.name, 'mysql')};`)
+      } else if (idx.status === 'modified' && idx.right) {
+        stmts.push(`DROP INDEX IF EXISTS ${escapeId(idx.name, 'mysql')};`)
+        const u = idx.right.unique ? 'UNIQUE ' : ''
+        stmts.push(
+          `CREATE ${u}INDEX ${escapeId(idx.right.name, 'mysql')} ON ${t} (${colsOf(idx.right)});`
+        )
+      }
+    }
+  }
+
+  for (const meta of table.metaDiffs) {
+    if (!selectedMeta.has(meta.field)) continue
+    if (meta.field === 'comment') {
+      stmts.push(`-- SQLite 表注释需通过迁移工具维护（无标准 COMMENT ON）`)
+    }
+  }
+
+  if (stmts.length === 0) return '-- 未选择任何变更项'
+
+  return [...headerUseDb(targetDb, 'sqlite'), `-- ${tableName}`, ...stmts].join('\n')
+}
+
+function generateAlterSql(
+  tableName: string,
+  targetDb: string,
+  table: TableDiff,
+  direction: SqlDirection,
+  selectedCols: Set<string>,
+  selectedIdxs: Set<string>,
+  selectedMeta: Set<string>,
+  dialect: DbType
+): string {
+  if (dialect === 'postgresql') {
+    return generateAlterSqlPostgresql(
+      tableName,
+      targetDb,
+      table,
+      direction,
+      selectedCols,
+      selectedIdxs,
+      selectedMeta
+    )
+  }
+  if (dialect === 'sqlite') {
+    return generateAlterSqlSqlite(
+      tableName,
+      targetDb,
+      table,
+      direction,
+      selectedCols,
+      selectedIdxs,
+      selectedMeta
+    )
+  }
+  return generateAlterSqlMysql(
+    tableName,
+    targetDb,
+    table,
+    direction,
+    selectedCols,
+    selectedIdxs,
+    selectedMeta
+  )
 }
 
 function generateCreateTableSql(
@@ -142,7 +446,8 @@ function generateCreateTableSql(
   table: TableDiff,
   direction: SqlDirection,
   selectedCols: Set<string>,
-  selectedIdxs: Set<string>
+  selectedIdxs: Set<string>,
+  dialect: DbType
 ): string {
   const isLTR = direction === 'left_to_right'
   const getCol = (c: ColumnDiff): ColumnInfo | null => (isLTR ? c.left : c.right)
@@ -155,37 +460,55 @@ function generateCreateTableSql(
     if (!selectedCols.has(col.name)) continue
     const info = getCol(col)
     if (!info) continue
-    if (info.key === 'PRI') pkCols.push(escapeId(info.name))
-    colLines.push(`  ${buildColumnDef({ ...info, key: '' })}`)
+    if (info.key === 'PRI') pkCols.push(escapeId(info.name, dialect))
+    colLines.push(`  ${buildColumnDef({ ...info, key: '' }, dialect)}`)
   }
   if (pkCols.length > 0) colLines.push(`  PRIMARY KEY (${pkCols.join(', ')})`)
+
+  const afterStmts: string[] = []
+  const tq = escapeId(tableName, dialect)
 
   for (const idx of table.indexes) {
     if (!selectedIdxs.has(idx.name) || idx.name === 'PRIMARY') continue
     const info = getIdx(idx)
     if (!info) continue
-    const unique = info.unique ? 'UNIQUE ' : ''
-    const using = info.type && info.type.toUpperCase() !== 'BTREE' ? ` USING ${info.type}` : ''
-    colLines.push(`  ${unique}INDEX ${escapeId(info.name)} (${info.columns.map(escapeId).join(', ')})${using}`)
+    if (dialect === 'mysql') {
+      const unique = info.unique ? 'UNIQUE ' : ''
+      const using = info.type && info.type.toUpperCase() !== 'BTREE' ? ` USING ${info.type}` : ''
+      colLines.push(
+        `  ${unique}INDEX ${escapeId(info.name, 'mysql')} (${info.columns.map((c) => escapeId(c, 'mysql')).join(', ')})${using}`
+      )
+    } else {
+      const u = info.unique ? 'UNIQUE ' : ''
+      afterStmts.push(
+        `CREATE ${u}INDEX ${escapeId(info.name, dialect)} ON ${tq} (${info.columns.map((c) => escapeId(c, dialect)).join(', ')});`
+      )
+    }
   }
 
   if (colLines.length === 0) return '-- 未选择任何字段'
 
-  return [
-    `USE ${escapeId(targetDb)};`,
-    '',
-    `CREATE TABLE ${escapeId(tableName)} (`,
+  const head = headerUseDb(targetDb, dialect)
+  const tail =
+    dialect === 'mysql'
+      ? ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;'
+      : ');'
+
+  const createBlock = [
+    ...head,
+    `CREATE TABLE ${tq} (`,
     colLines.join(',\n'),
-    `) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+    tail,
   ].join('\n')
+
+  return afterStmts.length > 0 ? [createBlock, '', ...afterStmts].join('\n') : createBlock
 }
 
-function generateDropTableSql(tableName: string, targetDb: string): string {
+function generateDropTableSql(tableName: string, targetDb: string, dialect: DbType): string {
   return [
     `-- ⚠️  警告：此操作将删除整张表及其所有数据，执行前请务必备份！`,
-    `USE ${escapeId(targetDb)};`,
-    '',
-    `DROP TABLE IF EXISTS ${escapeId(tableName)};`,
+    ...headerUseDb(targetDb, dialect),
+    `DROP TABLE IF EXISTS ${escapeId(tableName, dialect)};`,
   ].join('\n')
 }
 
@@ -210,6 +533,8 @@ export function SqlGeneratorDialog({
   rightDb,
   leftLabel,
   rightLabel,
+  leftSqlDialect,
+  rightSqlDialect,
 }: SqlGeneratorDialogProps) {
   const [direction, setDirection] = useState<SqlDirection>('left_to_right')
   const [selectedCols, setSelectedCols] = useState<Set<string>>(new Set())
@@ -237,6 +562,7 @@ export function SqlGeneratorDialog({
   }, [open, table, isTableOnly, diffCols, diffIdxs])
 
   const targetDb = direction === 'left_to_right' ? rightDb : leftDb
+  const targetDialect = direction === 'left_to_right' ? rightSqlDialect : leftSqlDialect
   const sourceLabel = direction === 'left_to_right' ? leftLabel : rightLabel
   const targetLabel = direction === 'left_to_right' ? rightLabel : leftLabel
 
@@ -247,13 +573,40 @@ export function SqlGeneratorDialog({
   const sql = useMemo(() => {
     if (isTableOnly) {
       if (action === 'create') {
-        return generateCreateTableSql(table.name, targetDb, table, direction, selectedCols, selectedIdxs)
+        return generateCreateTableSql(
+          table.name,
+          targetDb,
+          table,
+          direction,
+          selectedCols,
+          selectedIdxs,
+          targetDialect
+        )
       } else {
-        return generateDropTableSql(table.name, targetDb)
+        return generateDropTableSql(table.name, targetDb, targetDialect)
       }
     }
-    return generateAlterSql(table.name, targetDb, table, direction, selectedCols, selectedIdxs, selectedMeta)
-  }, [table, direction, selectedCols, selectedIdxs, selectedMeta, targetDb, isTableOnly, action])
+    return generateAlterSql(
+      table.name,
+      targetDb,
+      table,
+      direction,
+      selectedCols,
+      selectedIdxs,
+      selectedMeta,
+      targetDialect
+    )
+  }, [
+    table,
+    direction,
+    selectedCols,
+    selectedIdxs,
+    selectedMeta,
+    targetDb,
+    targetDialect,
+    isTableOnly,
+    action
+  ])
 
   const toggleCol = (name: string) => {
     setSelectedCols((prev) => {

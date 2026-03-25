@@ -44,5 +44,6 @@ const api = {
 }
 
 contextBridge.exposeInMainWorld('api', api)
+contextBridge.exposeInMainWorld('platform', process.platform)
 
 export type ElectronAPI = typeof api

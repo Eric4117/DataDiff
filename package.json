@@ -1,6 +1,7 @@
 {
   "name": "datadiff",
   "version": "1.0.0",
+  "license": "MIT",
   "description": "MySQL 数据库结构对比工具",
   "main": "./out/main/main.js",
   "author": "DataDiff",
@@ -12,6 +13,7 @@
     "package": "electron-vite build && electron-builder"
   },
   "dependencies": {
+    "better-sqlite3": "^11.6.0",
     "@radix-ui/react-dialog": "^1.1.2",
     "@radix-ui/react-label": "^2.1.0",
     "@radix-ui/react-select": "^2.1.2",
@@ -22,10 +24,13 @@
     "electron-store": "^8.2.0",
     "lucide-react": "^0.441.0",
     "mysql2": "^3.9.7",
+    "pg": "^8.13.1",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/pg": "^8.11.10",
     "@electron-toolkit/eslint-config-prettier": "^2.0.0",
     "@electron-toolkit/eslint-config-ts": "^2.0.0",
     "@electron-toolkit/tsconfig": "^1.0.1",
@@ -53,6 +58,9 @@
     "files": [
       "out/**/*",
       "resources/**/*"
+    ],
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**"
     ],
     "mac": {
       "target": "dmg"

@@ -5,6 +5,8 @@ interface DiffSummaryBarProps {
   summary: DiffSummary
   filter: DiffFilter
   onFilterChange: (f: DiffFilter) => void
+  /** 侧栏纵向布局，用于对比 tab 左侧 */
+  variant?: 'default' | 'sidebar'
 }
 
 interface FilterBtn {
@@ -15,7 +17,12 @@ interface FilterBtn {
   dotClass: string
 }
 
-export function DiffSummaryBar({ summary, filter, onFilterChange }: DiffSummaryBarProps) {
+export function DiffSummaryBar({
+  summary,
+  filter,
+  onFilterChange,
+  variant = 'default'
+}: DiffSummaryBarProps) {
   const mainFilters: FilterBtn[] = [
     {
       key: 'all',
@@ -95,6 +102,7 @@ export function DiffSummaryBar({ summary, filter, onFilterChange }: DiffSummaryB
   const renderBtn = (f: FilterBtn) => (
     <button
       key={f.key}
+      type="button"
       onClick={() => onFilterChange(f.key)}
       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
         filter === f.key
@@ -109,6 +117,42 @@ export function DiffSummaryBar({ summary, filter, onFilterChange }: DiffSummaryB
       </span>
     </button>
   )
+
+  if (variant === 'sidebar') {
+    const renderSidebarBtn = (f: FilterBtn) => (
+      <button
+        key={f.key}
+        type="button"
+        onClick={() => onFilterChange(f.key)}
+        className={`flex w-full items-center gap-2 px-2 py-1.5 rounded-md border text-left text-[11px] font-medium transition-colors ${
+          filter === f.key
+            ? `${f.activeClass} shadow-sm`
+            : 'border-transparent bg-transparent text-muted-foreground hover:bg-black/[0.06] dark:hover:bg-white/[0.06]'
+        }`}
+      >
+        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${f.dotClass}`} />
+        <span className="truncate flex-1 min-w-0">{f.label}</span>
+        <span className={`tabular-nums font-bold shrink-0 ${filter === f.key ? '' : 'text-foreground'}`}>
+          {f.count}
+        </span>
+      </button>
+    )
+
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-0.5">
+          表筛选
+        </div>
+        <div className="flex flex-col gap-1">{mainFilters.map(renderSidebarBtn)}</div>
+        <div className="pt-2 mt-0.5 border-t border-sidebar-border/80">
+          <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-0.5 mb-1">
+            差异细分
+          </div>
+          <div className="flex flex-col gap-1">{subFilters.map(renderSidebarBtn)}</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-2">

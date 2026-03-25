@@ -9,7 +9,14 @@ import {
   DialogTitle,
   DialogFooter
 } from './ui/dialog'
-import type { Connection } from '@/types'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from './ui/select'
+import type { Connection, DbType } from '@/types'
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
 
 interface ConnectionFormProps {
@@ -19,28 +26,75 @@ interface ConnectionFormProps {
   initialData?: Connection | null
 }
 
-const defaultForm: Omit<Connection, 'id'> = {
-  name: '',
-  host: '127.0.0.1',
-  port: 3306,
-  user: 'root',
-  password: ''
+function defaultsForType(type: DbType): Omit<Connection, 'id' | 'name'> {
+  switch (type) {
+    case 'sqlite':
+      return {
+        type: 'sqlite',
+        host: '',
+        port: 0,
+        user: '',
+        password: '',
+        filePath: ''
+      }
+    case 'postgresql':
+      return {
+        type: 'postgresql',
+        host: '127.0.0.1',
+        port: 5432,
+        user: 'postgres',
+        password: '',
+        database: 'postgres',
+        ssl: false
+      }
+    default:
+      return {
+        type: 'mysql',
+        host: '127.0.0.1',
+        port: 3306,
+        user: 'root',
+        password: ''
+      }
+  }
 }
 
+const emptyBase = { name: '' }
+
 export function ConnectionForm({ open, onClose, onSave, initialData }: ConnectionFormProps) {
-  const [form, setForm] = useState<Omit<Connection, 'id'>>(defaultForm)
+  const [form, setForm] = useState<Omit<Connection, 'id'>>({
+    ...emptyBase,
+    ...defaultsForType('mysql')
+  })
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (open) {
-      setForm(initialData ? { ...initialData } : { ...defaultForm })
+      if (initialData) {
+        const t = initialData.type ?? 'mysql'
+        setForm({
+          name: initialData.name,
+          ...defaultsForType(t),
+          ...initialData,
+          type: t
+        })
+      } else {
+        setForm({ ...emptyBase, ...defaultsForType('mysql') })
+      }
       setTestResult(null)
     }
   }, [open, initialData])
 
-  const handleChange = (field: keyof Omit<Connection, 'id'>, value: string | number) => {
+  const setType = (type: DbType) => {
+    setForm((prev) => ({
+      name: prev.name,
+      ...defaultsForType(type)
+    }))
+    setTestResult(null)
+  }
+
+  const handleChange = <K extends keyof Omit<Connection, 'id'>>(field: K, value: Connection[K]) => {
     setForm((prev) => ({ ...prev, [field]: value }))
     setTestResult(null)
   }
@@ -87,49 +141,107 @@ export function ConnectionForm({ open, onClose, onSave, initialData }: Connectio
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2 grid gap-1.5">
-              <Label htmlFor="host">主机地址</Label>
-              <Input
-                id="host"
-                placeholder="127.0.0.1"
-                value={form.host}
-                onChange={(e) => handleChange('host', e.target.value)}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="port">端口</Label>
-              <Input
-                id="port"
-                type="number"
-                placeholder="3306"
-                value={form.port}
-                onChange={(e) => handleChange('port', parseInt(e.target.value) || 3306)}
-              />
-            </div>
+          <div className="grid gap-1.5">
+            <Label>数据库类型</Label>
+            <Select value={form.type} onValueChange={(v) => setType(v as DbType)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mysql">MySQL / MariaDB</SelectItem>
+                <SelectItem value="sqlite">SQLite</SelectItem>
+                <SelectItem value="postgresql">PostgreSQL / Supabase</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          {form.type === 'sqlite' && (
             <div className="grid gap-1.5">
-              <Label htmlFor="user">用户名</Label>
+              <Label htmlFor="filePath">数据库文件路径</Label>
               <Input
-                id="user"
-                placeholder="root"
-                value={form.user}
-                onChange={(e) => handleChange('user', e.target.value)}
+                id="filePath"
+                placeholder="/path/to/database.db"
+                value={form.filePath ?? ''}
+                onChange={(e) => handleChange('filePath', e.target.value)}
               />
+              <p className="text-[11px] text-muted-foreground">本地 .db / .sqlite 文件的绝对路径</p>
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="password">密码</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="密码"
-                value={form.password}
-                onChange={(e) => handleChange('password', e.target.value)}
-              />
-            </div>
-          </div>
+          )}
+
+          {(form.type === 'mysql' || form.type === 'postgresql') && (
+            <>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2 grid gap-1.5">
+                  <Label htmlFor="host">主机地址</Label>
+                  <Input
+                    id="host"
+                    placeholder={form.type === 'postgresql' ? 'db.xxx.supabase.co' : '127.0.0.1'}
+                    value={form.host}
+                    onChange={(e) => handleChange('host', e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="port">端口</Label>
+                  <Input
+                    id="port"
+                    type="number"
+                    placeholder={form.type === 'postgresql' ? '5432' : '3306'}
+                    value={form.port || ''}
+                    onChange={(e) =>
+                      handleChange('port', parseInt(e.target.value, 10) || (form.type === 'postgresql' ? 5432 : 3306))
+                    }
+                  />
+                </div>
+              </div>
+
+              {form.type === 'postgresql' && (
+                <div className="grid gap-1.5">
+                  <Label htmlFor="database">默认数据库</Label>
+                  <Input
+                    id="database"
+                    placeholder="postgres"
+                    value={form.database ?? ''}
+                    onChange={(e) => handleChange('database', e.target.value)}
+                  />
+                  <p className="text-[11px] text-muted-foreground">用于测试连接与列举库名；对比时仍可另选库</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="user">用户名</Label>
+                  <Input
+                    id="user"
+                    placeholder={form.type === 'postgresql' ? 'postgres' : 'root'}
+                    value={form.user}
+                    onChange={(e) => handleChange('user', e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="password">密码</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="密码"
+                    value={form.password}
+                    onChange={(e) => handleChange('password', e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {form.type === 'postgresql' && (
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!form.ssl}
+                    onChange={(e) => handleChange('ssl', e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  使用 SSL（Supabase / 云数据库通常需要）
+                </label>
+              )}
+            </>
+          )}
 
           {testResult && (
             <div

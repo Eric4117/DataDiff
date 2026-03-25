@@ -50,7 +50,7 @@ export function ConnectionList({ connections, onAdd, onUpdate, onDelete }: Conne
       <div className="flex items-center justify-between px-6 py-4 border-b">
         <div>
           <h2 className="text-lg font-semibold">数据源管理</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">配置 MySQL 数据库连接</p>
+          <p className="text-sm text-muted-foreground mt-0.5">配置 MySQL、SQLite、PostgreSQL（含 Supabase）连接</p>
         </div>
         <Button
           size="sm"
@@ -85,10 +85,14 @@ export function ConnectionList({ connections, onAdd, onUpdate, onDelete }: Conne
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm">{conn.name}</span>
-                      <Badge variant="secondary" className="text-xs">MySQL</Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        {conn.type === 'sqlite' ? 'SQLite' : conn.type === 'postgresql' ? 'PostgreSQL' : 'MySQL'}
+                      </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {conn.user}@{conn.host}:{conn.port}
+                      {conn.type === 'sqlite'
+                        ? conn.filePath || '（未设置路径）'
+                        : `${conn.user}@${conn.host}:${conn.port}`}
                     </p>
                   </div>
                 </div>
