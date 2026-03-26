@@ -773,79 +773,88 @@ function TableStructureRow({
           </span>
           <Table2 className="h-4 w-4 shrink-0 text-primary" />
           <span className="font-mono font-medium text-sm truncate">{table.name}</span>
-          {table.meta.comment && (
-            <span className="text-xs text-muted-foreground truncate hidden sm:block max-w-[200px]">
-              {table.meta.comment}
-            </span>
-          )}
           <span className="text-xs text-muted-foreground shrink-0">
             {table.columns.length} 字段 · {table.indexes.length} 索引
           </span>
         </button>
 
-        {/* 复制表名 */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2 gap-1 shrink-0 text-xs text-muted-foreground"
-          onClick={handleCopyName}
-          title={`复制表名（${fullName}）`}
-        >
-          {copiedName ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
-          {!copiedName && <span>表名</span>}
-        </Button>
+        {/* 右侧切换区：默认显示注释，hover 时切换为操作按钮（固定宽度避免抖动） */}
+        <div className="shrink-0 relative w-[220px] h-7">
+          {/* 默认：表注释（无注释显示占位），hover 时隐藏 */}
+          <div className="absolute inset-0 flex items-center justify-end pr-1 group-hover:opacity-0 transition-opacity">
+            <span className="text-xs text-muted-foreground truncate max-w-full" title={table.meta.comment || ''}>
+              {table.meta.comment || '—'}
+            </span>
+          </div>
 
-        {/* 复制表结构 */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2 gap-1 shrink-0 text-xs text-muted-foreground"
-          onClick={handleCopyStruct}
-          title="复制完整表结构（可粘贴给 AI）"
-        >
-          {copiedStruct ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
-          {!copiedStruct && <span>结构</span>}
-        </Button>
-
-        {/* 项目模式：移出按钮（hover 才显示） */}
-        {activeProjectId && onRemoveFromProject && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 gap-1 shrink-0 text-xs text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={async (e) => { e.stopPropagation(); await onRemoveFromProject() }}
-            title="从项目中移出"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            <span>移出</span>
-          </Button>
-        )}
-
-        {/* 全部表模式：加入项目 */}
-        {!activeProjectId && (
-          <>
+          {/* hover：操作按钮（默认透明，悬浮时显示） */}
+          <div className="absolute inset-0 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity">
+            {/* 复制表名 */}
             <Button
-              ref={triggerRef}
               variant="ghost"
               size="sm"
-              className={`h-7 px-2 gap-1 shrink-0 text-xs ${projects.some(isInProject) ? 'text-amber-500' : 'text-muted-foreground'}`}
-              title="加入项目"
-              onClick={(e) => {
-                e.stopPropagation()
-                if (!showProjectPopover) {
-                  const rect = triggerRef.current?.getBoundingClientRect()
-                  if (rect) setPopoverPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
-                }
-                setShowProjectPopover((v) => !v)
-              }}
+              className="h-7 px-2 gap-1 text-xs text-muted-foreground"
+              onClick={handleCopyName}
+              title={`复制表名（${fullName}）`}
             >
-              {projects.some(isInProject)
-                ? <FolderOpen className="h-3.5 w-3.5" />
-                : <FolderPlus className="h-3.5 w-3.5" />}
-              <span>项目</span>
+              {copiedName ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+              {!copiedName && <span>表名</span>}
             </Button>
 
-            {showProjectPopover && popoverPos && createPortal(
+            {/* 复制结构 */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 gap-1 text-xs text-muted-foreground"
+              onClick={handleCopyStruct}
+              title="复制完整表结构（可粘贴给 AI）"
+            >
+              {copiedStruct ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+              {!copiedStruct && <span>结构</span>}
+            </Button>
+
+            {/* 项目模式：移出 */}
+            {activeProjectId && onRemoveFromProject && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 gap-1 text-xs text-muted-foreground hover:text-destructive"
+                onClick={async (e) => { e.stopPropagation(); await onRemoveFromProject() }}
+                title="从项目中移出"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span>移出</span>
+              </Button>
+            )}
+
+            {/* 全部表模式：加入项目（也在 hover 区内） */}
+            {!activeProjectId && (
+              <Button
+                ref={triggerRef}
+                variant="ghost"
+                size="sm"
+                className={`h-7 px-2 gap-1 text-xs ${projects.some(isInProject) ? 'text-amber-500' : 'text-muted-foreground'}`}
+                title="加入项目"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (!showProjectPopover) {
+                    const rect = triggerRef.current?.getBoundingClientRect()
+                    if (rect) setPopoverPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+                  }
+                  setShowProjectPopover((v) => !v)
+                }}
+              >
+                {projects.some(isInProject)
+                  ? <FolderOpen className="h-3.5 w-3.5" />
+                  : <FolderPlus className="h-3.5 w-3.5" />}
+                <span>项目</span>
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* popover portal（绝对定位，需保留在 group 容器外） */}
+        {!activeProjectId && showProjectPopover && popoverPos && createPortal(
               <div
                 ref={popoverRef}
                 style={{ top: popoverPos.top, right: popoverPos.right }}
@@ -907,8 +916,6 @@ function TableStructureRow({
               </div>,
               document.body
             )}
-          </>
-        )}
       </div>
 
       {expanded && (
