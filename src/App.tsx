@@ -1,22 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { ConnectionList } from './components/ConnectionList'
 import { CompareSelector } from './components/CompareSelector'
 import { TableDiffList } from './components/TableDiffList'
 import { StructureViewer } from './components/StructureViewer'
 import { HomePage } from './components/HomePage'
+import { AuditView } from './components/AuditView'
 import { ProjectSidebarContent } from './components/ProjectSidebar'
-import { AppSidebar } from './components/AppSidebar'
+import { AppSidebar, type SidebarTab } from './components/AppSidebar'
 import { TooltipProvider } from './components/ui/tooltip'
-import type { Connection, CompareTarget, DiffResult, DiffFilter, Project } from './types'
+import type { Connection, CompareTarget, DiffResult, DiffFilter, Project, AutoAuditPayload } from './types'
 import { DiffSummaryBar } from './components/DiffSummaryBar'
-import { Loader2, AlertCircle } from 'lucide-react'
+import { Loader2, AlertCircle, ShieldCheck, X } from 'lucide-react'
 
-type Tab = 'home' | 'compare' | 'structure' | 'connections'
+type Tab = SidebarTab
 
 interface CompareState {
   left: CompareTarget
   right: CompareTarget
   result: DiffResult
+}
+
+interface AuditToast {
+  id: number
+  payload: AutoAuditPayload
 }
 
 export default function App() {
@@ -33,6 +39,12 @@ export default function App() {
   const [presetCompare, setPresetCompare] = useState<{ left: CompareTarget; right: CompareTarget } | null>(null)
   const [presetStructure, setPresetStructure] = useState<CompareTarget | null>(null)
 
+  // 审计徽章：切到 audit tab 后归零
+  const [newAuditCount, setNewAuditCount] = useState(0)
+  // Toast 队列
+  const [auditToasts, setAuditToasts] = useState<AuditToast[]>([])
+  const toastIdRef = useRef(0)
+
   const refreshProjects = useCallback(async () => {
     const list = await window.api.projects.list()
     setProjects(list)
@@ -47,6 +59,24 @@ export default function App() {
   useEffect(() => {
     setDiffFilter('different')
   }, [compareState])
+
+  // 订阅自动审计推送事件
+  useEffect(() => {
+    const unsub = window.api.audit.onAutoCreated((payload) => {
+      setNewAuditCount((n) => n + 1)
+      const id = ++toastIdRef.current
+      setAuditToasts((prev) => [...prev, { id, payload }])
+      setTimeout(() => {
+        setAuditToasts((prev) => prev.filter((t) => t.id !== id))
+      }, 4000)
+    })
+    return unsub
+  }, [])
+
+  const handleTabChange = (t: Tab) => {
+    if (t === 'audit') setNewAuditCount(0)
+    setTab(t)
+  }
 
   const refreshConnections = useCallback(async () => {
     const list = await window.api.connections.list()
@@ -132,13 +162,46 @@ export default function App() {
       <div className="flex h-screen bg-background overflow-hidden">
         <AppSidebar
           tab={tab}
-          onTabChange={setTab}
+          onTabChange={handleTabChange}
           connectionsCount={connections.length}
+          newAuditCount={newAuditCount}
           structurePanel={structurePanel}
           compareFiltersPanel={compareFiltersPanel}
         />
 
-        <main className="flex-1 min-w-0 overflow-hidden flex flex-col">
+        <main className="flex-1 min-w-0 overflow-hidden flex flex-col relative">
+          {/* 自动审计 Toast 通知 */}
+          {auditToasts.length > 0 && (
+            <div className="absolute top-3 right-3 z-50 flex flex-col gap-2 pointer-events-none">
+              {auditToasts.map((toast) => (
+                <div
+                  key={toast.id}
+                  className="pointer-events-auto flex items-start gap-2.5 rounded-lg border border-primary/20 bg-primary/5 px-3.5 py-2.5 text-sm shadow-md max-w-[320px]"
+                >
+                  <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground leading-snug">
+                      {toast.payload.database} 检测到结构变更
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      {toast.payload.recordName}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      修改 {toast.payload.summary.modified} · 新增 {toast.payload.summary.rightOnly} · 删除 {toast.payload.summary.leftOnly}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                    onClick={() => setAuditToasts((prev) => prev.filter((t) => t.id !== toast.id))}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {tab === 'home' ? (
             <div className="flex-1 overflow-auto">
               <HomePage
@@ -155,6 +218,10 @@ export default function App() {
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
               />
+            </div>
+          ) : tab === 'audit' ? (
+            <div className="flex-1 overflow-auto">
+              <AuditView connections={connections} />
             </div>
           ) : tab === 'structure' ? (
             <div className="flex-1 overflow-auto">

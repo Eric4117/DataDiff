@@ -97,3 +97,12 @@ npm run package
 ---
 
 **免责声明**：本工具会连接你配置的数据库并读取元数据，请在可信环境中使用，勿将生产凭据提交到公开仓库。
+
+
+三种场景汇总：
+
+目标平台	命令
+Mac Intel (x64)	npm run build && npx electron-builder --mac --x64
+Mac M系列 (arm64)	npm run build && npx electron-builder --mac --arm64
+Mac 通用包 (兼容两种)	npm run build && npx electron-builder --mac --universal
+Windows x64	npm run build && npx electron-builder --win --x64（需 Windows 环境）

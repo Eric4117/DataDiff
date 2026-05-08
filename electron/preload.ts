@@ -1,5 +1,16 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Connection, CompareTarget, DiffResult, DatabaseStructure, Shortcut, Project, ProjectTable } from '../src/types'
+import type {
+  Connection,
+  CompareTarget,
+  DiffResult,
+  DatabaseStructure,
+  Shortcut,
+  Project,
+  ProjectTable,
+  SchemaSnapshot,
+  AuditRecord,
+  AutoAuditPayload
+} from '../src/types'
 
 const api = {
   connections: {
@@ -40,6 +51,27 @@ const api = {
       ipcRenderer.invoke('projects:add-table', projectId, table),
     removeTable: (projectId: string, table: ProjectTable): Promise<Project> =>
       ipcRenderer.invoke('projects:remove-table', projectId, table)
+  },
+  audit: {
+    snapshotSave: (connId: string, database: string, name?: string): Promise<SchemaSnapshot> =>
+      ipcRenderer.invoke('audit:snapshot-save', connId, database, name),
+    snapshotList: (): Promise<Omit<SchemaSnapshot, 'tables'>[]> =>
+      ipcRenderer.invoke('audit:snapshot-list'),
+    snapshotDelete: (id: string): Promise<boolean> =>
+      ipcRenderer.invoke('audit:snapshot-delete', id),
+    generate: (snapshotId: string, name?: string): Promise<AuditRecord> =>
+      ipcRenderer.invoke('audit:generate', snapshotId, name),
+    recordList: (): Promise<(Omit<AuditRecord, 'diff'> & { diff: { tables: never[]; summary: AuditRecord['diff']['summary'] } })[]> =>
+      ipcRenderer.invoke('audit:record-list'),
+    recordGet: (id: string): Promise<AuditRecord> =>
+      ipcRenderer.invoke('audit:record-get', id),
+    recordDelete: (id: string): Promise<boolean> =>
+      ipcRenderer.invoke('audit:record-delete', id),
+    onAutoCreated: (cb: (payload: AutoAuditPayload) => void): (() => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, payload: AutoAuditPayload) => cb(payload)
+      ipcRenderer.on('audit:auto-created', handler)
+      return () => ipcRenderer.removeListener('audit:auto-created', handler)
+    }
   }
 }
 

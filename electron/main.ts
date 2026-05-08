@@ -4,6 +4,7 @@ import { registerConnectionHandlers } from './ipc/connections'
 import { registerSchemaHandlers } from './ipc/schema'
 import { registerShortcutHandlers } from './ipc/shortcuts'
 import { registerProjectHandlers } from './ipc/projects'
+import { registerAuditHandlers } from './ipc/audit'
 
 const isDev = process.env.NODE_ENV === 'development'
 
@@ -54,6 +55,7 @@ app.whenReady().then(() => {
   registerSchemaHandlers()
   registerShortcutHandlers()
   registerProjectHandlers()
+  registerAuditHandlers()
 
   createWindow()
 

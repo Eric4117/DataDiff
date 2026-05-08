@@ -1,7 +1,7 @@
 import React from 'react'
-import { Database, GitCompare, Home, LayoutGrid } from 'lucide-react'
+import { Database, GitCompare, Home, LayoutGrid, ShieldCheck } from 'lucide-react'
 
-export type SidebarTab = 'home' | 'compare' | 'structure' | 'connections'
+export type SidebarTab = 'home' | 'compare' | 'structure' | 'connections' | 'audit'
 
 const isMac = typeof window !== 'undefined' && window.platform === 'darwin'
 
@@ -12,6 +12,8 @@ interface AppSidebarProps {
   tab: SidebarTab
   onTabChange: (t: SidebarTab) => void
   connectionsCount: number
+  /** 自动审计产生的未读报告数，切到 audit tab 后由父组件归零 */
+  newAuditCount?: number
   /** 结构 tab 且已有数据源时：侧栏项目列表；对比选择在主内容区，此处不传 */
   structurePanel: React.ReactNode | null
   /** 对比 tab 且已有对比结果时：左侧表筛选 / 差异细分 */
@@ -22,6 +24,7 @@ export function AppSidebar({
   tab,
   onTabChange,
   connectionsCount,
+  newAuditCount = 0,
   structurePanel,
   compareFiltersPanel
 }: AppSidebarProps) {
@@ -73,6 +76,14 @@ export function AppSidebar({
           label="结构"
         />
         <SidebarNavItem
+          active={tab === 'audit'}
+          onClick={() => onTabChange('audit')}
+          icon={<ShieldCheck className="h-4 w-4" />}
+          label="审计"
+          badge={newAuditCount > 0 ? newAuditCount : undefined}
+          badgeDot
+        />
+        <SidebarNavItem
           active={tab === 'connections'}
           onClick={() => onTabChange('connections')}
           icon={<Database className="h-4 w-4" />}
@@ -103,13 +114,16 @@ function SidebarNavItem({
   onClick,
   icon,
   label,
-  badge
+  badge,
+  badgeDot = false
 }: {
   active: boolean
   onClick: () => void
   icon: React.ReactNode
   label: string
   badge?: number
+  /** 徽章使用强调色（用于审计未读提示） */
+  badgeDot?: boolean
 }) {
   return (
     <button
@@ -125,8 +139,12 @@ function SidebarNavItem({
       <span className="flex-1 truncate">{label}</span>
       {badge != null && (
         <span
-          className={`text-[11px] font-bold tabular-nums shrink-0 ${
-            active ? 'text-primary/70' : 'text-muted-foreground'
+          className={`text-[11px] font-bold tabular-nums shrink-0 px-1 rounded-full ${
+            badgeDot
+              ? 'bg-orange-500 text-white min-w-[18px] text-center'
+              : active
+                ? 'text-primary/70'
+                : 'text-muted-foreground'
           }`}
         >
           {badge}

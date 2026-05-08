@@ -148,6 +148,38 @@ export interface Project {
   updatedAt: number
 }
 
+/** 数据库结构快照（某一时刻的完整 Schema） */
+export interface SchemaSnapshot {
+  id: string
+  /** 用户命名，默认为 "数据库名 YYYY-MM-DD HH:mm" */
+  name: string
+  connectionId: string
+  database: string
+  tables: TableStructure[]
+  createdAt: number
+}
+
+/** 审计记录（快照 vs 当前库 的 diff 结果） */
+export interface AuditRecord {
+  id: string
+  /** 用户命名，默认为快照名 + 生成时间 */
+  name: string
+  snapshotId: string
+  snapshotName: string
+  connectionId: string
+  database: string
+  createdAt: number
+  diff: DiffResult
+}
+
+/** 自动审计推送通知载荷 */
+export interface AutoAuditPayload {
+  database: string
+  summary: DiffSummary
+  recordId: string
+  recordName: string
+}
+
 /** 快捷操作 */
 export interface Shortcut {
   id: string
